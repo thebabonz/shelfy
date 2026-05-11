@@ -2,7 +2,7 @@
   "name": "thebabonz-project-manager",
   "displayName": "Projects Manager",
   "description": "Save project directories globally and organize them in virtual folders.",
-  "version": "0.0.29",
+  "version": "0.0.30",
   "publisher": "bbz",
   "repository": {
     "type": "git",
