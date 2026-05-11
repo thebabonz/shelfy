@@ -1,9 +1,13 @@
 {
-  "name": "bbz.project-manager",
+  "name": "project-manager",
   "displayName": "Project Manager",
   "description": "Save project directories globally and organize them in virtual folders.",
   "version": "0.0.29",
   "publisher": "bbz",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/thebabonz/project-settings.git"
+  },
   "engines": {
     "vscode": "^1.90.0"
   },
@@ -318,7 +322,7 @@
   "scripts": {
     "compile": "tsc -p ./",
     "watch": "tsc -watch -p ./",
-    "package": "vsce package --allow-missing-repository"
+    "package": "vsce package"
   },
   "devDependencies": {
     "@types/node": "^20.14.10",
