@@ -1,6 +1,6 @@
 {
-  "name": "thebabonz-project-manager",
-  "displayName": "Projects Manager",
+  "name": "shelfy",
+  "displayName": "Shelfy",
   "description": "Save project directories globally and organize them in virtual folders.",
   "version": "0.0.29",
   "publisher": "bbz",
@@ -21,7 +21,7 @@
       "activitybar": [
         {
           "id": "globalProjects",
-          "title": "Project Manager",
+          "title": "Shelfy",
           "icon": "media/projects.svg"
         }
       ]
@@ -30,7 +30,7 @@
       "globalProjects": [
         {
           "id": "globalProjectsView",
-          "name": "Project Manager",
+          "name": "Shelfy",
           "icon": "media/projects.svg"
         }
       ]
@@ -146,11 +146,11 @@
       },
       {
         "command": "globalProjects.exportConfiguration",
-        "title": "Project Manager: Export Configuration"
+        "title": "Shelfy: Export Configuration"
       },
       {
         "command": "globalProjects.importConfiguration",
-        "title": "Project Manager: Import Configuration"
+        "title": "Shelfy: Import Configuration"
       },
       {
         "command": "globalProjects.cloneGroupWithNewBase",
@@ -299,7 +299,7 @@
       ]
     },
     "configuration": {
-      "title": "Project Manager",
+      "title": "Shelfy",
       "properties": {
         "globalProjects.clickAction": {
           "type": "string",

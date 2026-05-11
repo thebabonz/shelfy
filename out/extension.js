@@ -271,7 +271,7 @@ async function createGroup(store, provider, parentGroupId) {
 }
 async function exportConfiguration(store) {
     const target = await vscode.window.showSaveDialog({
-        defaultUri: vscode.Uri.file(path.join(os.homedir(), "project-manager.json")),
+        defaultUri: vscode.Uri.file(path.join(os.homedir(), "shelfy.json")),
         filters: {
             JSON: ["json"]
         },

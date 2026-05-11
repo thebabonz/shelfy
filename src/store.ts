@@ -465,7 +465,7 @@ function findParentGroupIdForNode(
 }
 
 function normalizeRootData(value: unknown): RootData {
-  const record = asRecord(value, "The selected file does not contain a valid Project Manager configuration.");
+  const record = asRecord(value, "The selected file does not contain a valid Shelfy configuration.");
 
   if (record.version !== 2) {
     throw new Error(`Unsupported configuration version "${String(record.version)}".`);

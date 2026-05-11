@@ -1,4 +1,4 @@
-# Project Manager
+# Shelfy
 
 Manage and organize project folders globally in Visual Studio Code — independent of your current workspace.
 
@@ -32,7 +32,7 @@ or Peacock workspace color:
 
 ### Add a project
 
-1. Open the **Project Manager** view in the Activity Bar
+1. Open the **Shelfy** view in the Activity Bar
 2. Click **Add Project**
 3. Select a folder
 
