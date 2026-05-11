@@ -1,4 +1,4 @@
-# Global Projects
+# Project Manager
 
 Manage and organize project folders globally in Visual Studio Code — independent of your current workspace.
 
@@ -18,6 +18,7 @@ or Peacock workspace color:
 - 🧲 Drag & drop to reorder and regroup projects
 - 🚫 Prevent duplicate project paths
 - ⚡ Quick open projects directly from the sidebar
+- 💾 Import or export the full folders, projects, and scripts configuration as JSON
 
 ---
 
@@ -31,7 +32,7 @@ or Peacock workspace color:
 
 ### Add a project
 
-1. Open the **Global Projects** view in the Activity Bar
+1. Open the **Project Manager** view in the Activity Bar
 2. Click **Add Project**
 3. Select a folder
 
@@ -53,6 +54,11 @@ or Peacock workspace color:
 
 - Click a project row → behavior is controlled by `globalProjects.clickAction`
 - Use inline actions to open in current window or new window directly
+
+### Import or export configuration
+
+- Use the Command Palette commands `Export Configuration` and `Import Configuration` to save or restore the full folders, projects, and scripts setup as JSON
+- Importing a JSON file replaces the current saved configuration
 
 ### Configure click behavior
 

@@ -1,5 +1,5 @@
 import * as vscode from "vscode";
-import { GroupNodeData, NodeData, ProjectNodeData } from "./model";
+import { GroupNodeData, NodeData, ProjectNodeData, ProjectScriptData } from "./model";
 import { readProjectColor } from "./projectColor";
 import { ProjectStore } from "./store";
 import * as crypto from "crypto";
@@ -31,13 +31,25 @@ export class ProjectItem extends vscode.TreeItem {
     public readonly project: ProjectNodeData,
     iconPath: vscode.ThemeIcon | vscode.Uri,
     projectColor?: string,
-    showPath = true
+    showPath = true,
+    editMode = false
   ) {
-    super(project.name, vscode.TreeItemCollapsibleState.None);
+    const scriptCount = project.scripts?.length ?? 0;
+
+    super(
+      project.name,
+      scriptCount > 0
+        ? editMode
+          ? vscode.TreeItemCollapsibleState.Expanded
+          : vscode.TreeItemCollapsibleState.Collapsed
+        : vscode.TreeItemCollapsibleState.None
+    );
+
     this.id = project.id;
     this.contextValue = "project";
     this.description = showPath ? project.projectPath : undefined;
-    this.tooltip = `${project.projectPath}${projectColor ? `\nColor: ${projectColor}` : ""}`;
+    const scriptSummary = scriptCount > 0 ? `\nScripts: ${scriptCount}` : "";
+    this.tooltip = `${project.projectPath}${projectColor ? `\nColor: ${projectColor}` : ""}${scriptSummary}`;
     this.command = {
       command: "globalProjects.openProjectFromRow",
       title: "Open Project",
@@ -47,12 +59,45 @@ export class ProjectItem extends vscode.TreeItem {
   }
 }
 
+export class ScriptItem extends vscode.TreeItem {
+  constructor(
+    public readonly project: ProjectNodeData,
+    public readonly script: ProjectScriptData,
+    editMode: boolean
+  ) {
+    super(
+      script.kind === "package" ? script.scriptName : script.name,
+      vscode.TreeItemCollapsibleState.None
+    );
+
+    this.id = script.id;
+    this.contextValue = "script";
+    this.description = script.kind === "package" ? "package.json" : script.command;
+    this.tooltip =
+      script.kind === "package"
+        ? `Runs package.json script "${script.scriptName}"\n${project.projectPath}`
+        : `${script.command}\n${project.projectPath}`;
+
+    if (!editMode) {
+      this.command = {
+        command: "globalProjects.runProjectScript",
+        title: "Run Script",
+        arguments: [this]
+      };
+    }
+
+    this.iconPath = new vscode.ThemeIcon("terminal");
+  }
+}
+
 export class GlobalProjectsProvider
   implements
-    vscode.TreeDataProvider<GroupItem | ProjectItem>,
-    vscode.TreeDragAndDropController<GroupItem | ProjectItem>
+    vscode.TreeDataProvider<GroupItem | ProjectItem | ScriptItem>,
+    vscode.TreeDragAndDropController<GroupItem | ProjectItem | ScriptItem>
 {
-  private readonly emitter = new vscode.EventEmitter<GroupItem | ProjectItem | undefined | void>();
+  private readonly emitter = new vscode.EventEmitter<
+    GroupItem | ProjectItem | ScriptItem | undefined | void
+  >();
   readonly onDidChangeTreeData = this.emitter.event;
 
   get dropMimeTypes(): readonly string[] {
@@ -105,17 +150,23 @@ export class GlobalProjectsProvider
     this.emitter.fire();
   }
 
-  getTreeItem(element: GroupItem | ProjectItem): vscode.TreeItem {
+  getTreeItem(element: GroupItem | ProjectItem | ScriptItem): vscode.TreeItem {
     return element;
   }
 
-  async getChildren(element?: GroupItem | ProjectItem): Promise<Array<GroupItem | ProjectItem>> {
+  async getChildren(
+    element?: GroupItem | ProjectItem | ScriptItem
+  ): Promise<Array<GroupItem | ProjectItem | ScriptItem>> {
     if (!element) {
       return this.toItems(this.store.read().children);
     }
 
     if (element instanceof GroupItem) {
       return this.toItems(element.group.children);
+    }
+
+    if (element instanceof ProjectItem) {
+      return this.toScriptItems(element.project);
     }
 
     return [];
@@ -162,11 +213,15 @@ export class GlobalProjectsProvider
           .getConfiguration("globalProjects")
           .get<boolean>("showProjectPath", false);
 
-        items.push(new ProjectItem(node, iconPath, color, showPath));
+        items.push(new ProjectItem(node, iconPath, color, showPath, this.editMode));
       }
     }
 
     return items;
+  }
+
+  private toScriptItems(project: ProjectNodeData): ScriptItem[] {
+    return (project.scripts ?? []).map((script) => new ScriptItem(project, script, this.editMode));
   }
 
   private sortNodes(nodes: NodeData[]): NodeData[] {
@@ -191,7 +246,7 @@ export class GlobalProjectsProvider
   }
 
   async handleDrag(
-    source: readonly (GroupItem | ProjectItem)[],
+    source: readonly (GroupItem | ProjectItem | ScriptItem)[],
     dataTransfer: vscode.DataTransfer
   ): Promise<void> {
     if (!this.editMode) {
@@ -203,6 +258,10 @@ export class GlobalProjectsProvider
     }
 
     const item = source[0];
+    if (item instanceof ScriptItem) {
+      return;
+    }
+
     const payload: DragPayload =
       item instanceof GroupItem
         ? { nodeId: item.group.id, nodeKind: "group" }
@@ -215,7 +274,7 @@ export class GlobalProjectsProvider
   }
 
   async handleDrop(
-    target: GroupItem | ProjectItem | undefined,
+    target: GroupItem | ProjectItem | ScriptItem | undefined,
     dataTransfer: vscode.DataTransfer
   ): Promise<void> {
     if (!this.editMode) {
@@ -229,6 +288,10 @@ export class GlobalProjectsProvider
 
     const raw = await item.asString();
     const payload = JSON.parse(raw) as DragPayload;
+
+    if (target instanceof ScriptItem) {
+      return;
+    }
 
     if (target instanceof ProjectItem) {
       const targetPosition = this.findNodePosition(target.project.id);

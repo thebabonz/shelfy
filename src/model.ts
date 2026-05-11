@@ -5,11 +5,29 @@ export type GroupNodeData = {
   children: NodeData[];
 };
 
+export type PackageProjectScriptData = {
+  kind: "package";
+  id: string;
+  scriptName: string;
+};
+
+export type CustomProjectScriptData = {
+  kind: "custom";
+  id: string;
+  name: string;
+  command: string;
+};
+
+export type ProjectScriptData = PackageProjectScriptData | CustomProjectScriptData;
+
+export type NewProjectScriptData = Omit<PackageProjectScriptData, "id"> | Omit<CustomProjectScriptData, "id">;
+
 export type ProjectNodeData = {
   kind: "project";
   id: string;
   name: string;
   projectPath: string;
+  scripts?: ProjectScriptData[];
 };
 
 export type NodeData = GroupNodeData | ProjectNodeData;

@@ -41,7 +41,7 @@ export async function readProjectColor(projectPath: string): Promise<string | un
 
     return undefined;
   } catch (error) {
-    console.error("Global Projects: failed to read project color", projectPath, error);
+    console.error("Project Manager: failed to read project color", projectPath, error);
     return undefined;
   }
 }

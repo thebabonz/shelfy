@@ -51,6 +51,14 @@ class ProjectStore {
             children: []
         });
     }
+    exportData() {
+        return structuredClone(this.read());
+    }
+    async importData(data) {
+        const normalized = normalizeRootData(data);
+        await this.write(normalized);
+        return normalized;
+    }
     async write(data) {
         await this.context.globalState.update(STORAGE_KEY, data);
     }
@@ -104,7 +112,8 @@ class ProjectStore {
             kind: "project",
             id: crypto.randomUUID(),
             name: input.name,
-            projectPath: normalized
+            projectPath: normalized,
+            scripts: []
         };
         if (!input.parentGroupId) {
             data.children.push(project);
@@ -118,6 +127,50 @@ class ProjectStore {
         }
         await this.write(data);
         return project;
+    }
+    async addProjectScripts(projectId, scripts) {
+        const data = this.read();
+        const project = findProjectById(data.children, projectId);
+        if (!project) {
+            throw new Error("Project not found.");
+        }
+        const projectScripts = project.scripts ?? (project.scripts = []);
+        const added = [];
+        for (const script of scripts) {
+            if (hasMatchingProjectScript(projectScripts, script)) {
+                continue;
+            }
+            const nextScript = script.kind === "package"
+                ? {
+                    kind: "package",
+                    id: crypto.randomUUID(),
+                    scriptName: script.scriptName
+                }
+                : {
+                    kind: "custom",
+                    id: crypto.randomUUID(),
+                    name: script.name,
+                    command: script.command
+                };
+            projectScripts.push(nextScript);
+            added.push(nextScript);
+        }
+        await this.write(data);
+        return added;
+    }
+    async removeProjectScript(projectId, scriptId) {
+        const data = this.read();
+        const project = findProjectById(data.children, projectId);
+        if (!project) {
+            throw new Error("Project not found.");
+        }
+        const scripts = project.scripts ?? [];
+        const index = scripts.findIndex((script) => script.id === scriptId);
+        if (index < 0) {
+            throw new Error("Script not found.");
+        }
+        scripts.splice(index, 1);
+        await this.write(data);
     }
     async removeNode(nodeId) {
         const data = this.read();
@@ -329,11 +382,34 @@ function deepCloneGroupWithRebase(group, oldBase, newBase, newName) {
                     kind: "project",
                     id: crypto.randomUUID(),
                     name: child.name,
-                    projectPath: rebasePath(child.projectPath, oldBase, newBase)
+                    projectPath: rebasePath(child.projectPath, oldBase, newBase),
+                    scripts: child.scripts?.map(cloneProjectScript)
                 };
             }
         })
     };
+}
+function cloneProjectScript(script) {
+    return script.kind === "package"
+        ? {
+            kind: "package",
+            id: crypto.randomUUID(),
+            scriptName: script.scriptName
+        }
+        : {
+            kind: "custom",
+            id: crypto.randomUUID(),
+            name: script.name,
+            command: script.command
+        };
+}
+function hasMatchingProjectScript(existingScripts, nextScript) {
+    if (nextScript.kind === "package") {
+        return existingScripts.some((script) => script.kind === "package" && script.scriptName === nextScript.scriptName);
+    }
+    return existingScripts.some((script) => {
+        return script.kind === "custom" && script.command === nextScript.command;
+    });
 }
 function findParentGroupIdForNode(nodes, targetId, currentParentId = undefined) {
     for (const node of nodes) {
@@ -348,5 +424,117 @@ function findParentGroupIdForNode(nodes, targetId, currentParentId = undefined) 
         }
     }
     return { found: false };
+}
+function normalizeRootData(value) {
+    const record = asRecord(value, "The selected file does not contain a valid Project Manager configuration.");
+    if (record.version !== 2) {
+        throw new Error(`Unsupported configuration version "${String(record.version)}".`);
+    }
+    if (!Array.isArray(record.children)) {
+        throw new Error("The selected configuration is missing its project tree.");
+    }
+    const usedIds = new Set();
+    const projectPaths = new Set();
+    return {
+        version: 2,
+        children: normalizeNodes(record.children, usedIds, projectPaths, "root")
+    };
+}
+function normalizeNodes(value, usedIds, projectPaths, location) {
+    if (!Array.isArray(value)) {
+        throw new Error(`Expected an array of items at ${location}.`);
+    }
+    return value.map((node, index) => normalizeNode(node, usedIds, projectPaths, `${location}[${index}]`));
+}
+function normalizeNode(value, usedIds, projectPaths, location) {
+    const record = asRecord(value, `Invalid item at ${location}.`);
+    if (record.kind === "group") {
+        return {
+            kind: "group",
+            id: getUniqueId(record.id, usedIds),
+            name: readNonEmptyString(record.name, `Group name at ${location}`),
+            children: normalizeNodes(record.children ?? [], usedIds, projectPaths, `${location}.children`)
+        };
+    }
+    if (record.kind === "project") {
+        const projectPath = normalizeProjectPath(readNonEmptyString(record.projectPath, `Project path at ${location}`));
+        if (projectPaths.has(projectPath)) {
+            throw new Error(`Duplicate project path in import file: "${projectPath}".`);
+        }
+        projectPaths.add(projectPath);
+        return {
+            kind: "project",
+            id: getUniqueId(record.id, usedIds),
+            name: readNonEmptyString(record.name, `Project name at ${location}`),
+            projectPath,
+            scripts: normalizeProjectScripts(record.scripts ?? [], usedIds, `${location}.scripts`)
+        };
+    }
+    throw new Error(`Unsupported item kind at ${location}.`);
+}
+function normalizeProjectScripts(value, usedIds, location) {
+    if (!Array.isArray(value)) {
+        throw new Error(`Expected an array of scripts at ${location}.`);
+    }
+    const seenScripts = new Set();
+    const scripts = [];
+    for (let index = 0; index < value.length; index += 1) {
+        const script = normalizeProjectScript(value[index], usedIds, `${location}[${index}]`);
+        const scriptKey = script.kind === "package" ? `package:${script.scriptName}` : `custom:${script.command}`;
+        if (seenScripts.has(scriptKey)) {
+            throw new Error(`Duplicate script entry at ${location}: "${scriptKey}".`);
+        }
+        seenScripts.add(scriptKey);
+        scripts.push(script);
+    }
+    return scripts;
+}
+function normalizeProjectScript(value, usedIds, location) {
+    const record = asRecord(value, `Invalid script at ${location}.`);
+    if (record.kind === "package") {
+        return {
+            kind: "package",
+            id: getUniqueId(record.id, usedIds),
+            scriptName: readNonEmptyString(record.scriptName, `Package script name at ${location}`)
+        };
+    }
+    if (record.kind === "custom") {
+        return {
+            kind: "custom",
+            id: getUniqueId(record.id, usedIds),
+            name: readNonEmptyString(record.name, `Custom script name at ${location}`),
+            command: readNonEmptyString(record.command, `Custom script command at ${location}`)
+        };
+    }
+    throw new Error(`Unsupported script kind at ${location}.`);
+}
+function asRecord(value, message) {
+    if (typeof value !== "object" || value === null || Array.isArray(value)) {
+        throw new Error(message);
+    }
+    return value;
+}
+function readNonEmptyString(value, label) {
+    if (typeof value !== "string") {
+        throw new Error(`${label} must be a non-empty string.`);
+    }
+    const normalized = value.trim();
+    if (normalized.length === 0) {
+        throw new Error(`${label} must be a non-empty string.`);
+    }
+    return normalized;
+}
+function getUniqueId(value, usedIds) {
+    const preferred = typeof value === "string" && value.trim().length > 0 ? value.trim() : undefined;
+    if (preferred && !usedIds.has(preferred)) {
+        usedIds.add(preferred);
+        return preferred;
+    }
+    let generated = crypto.randomUUID();
+    while (usedIds.has(generated)) {
+        generated = crypto.randomUUID();
+    }
+    usedIds.add(generated);
+    return generated;
 }
 //# sourceMappingURL=store.js.map

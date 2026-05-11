@@ -1,9 +1,9 @@
 {
-  "name": "global-projects",
-  "displayName": "Global Projects",
+  "name": "bbz.project-manager",
+  "displayName": "Project Manager",
   "description": "Save project directories globally and organize them in virtual folders.",
-  "version": "0.0.23",
-  "publisher": "your-name",
+  "version": "0.0.29",
+  "publisher": "bbz",
   "engines": {
     "vscode": "^1.90.0"
   },
@@ -17,7 +17,7 @@
       "activitybar": [
         {
           "id": "globalProjects",
-          "title": "Global Projects",
+          "title": "Project Manager",
           "icon": "media/projects.svg"
         }
       ]
@@ -26,7 +26,7 @@
       "globalProjects": [
         {
           "id": "globalProjectsView",
-          "name": "Global Projects",
+          "name": "Project Manager",
           "icon": "media/projects.svg"
         }
       ]
@@ -73,6 +73,30 @@
         }
       },
       {
+        "command": "globalProjects.addProjectScript",
+        "title": "Add Script",
+        "icon": {
+          "light": "media/light/add-script.svg",
+          "dark": "media/dark/add-script.svg"
+        }
+      },
+      {
+        "command": "globalProjects.runProjectScript",
+        "title": "Run Script",
+        "icon": {
+          "light": "media/light/run-script.svg",
+          "dark": "media/dark/run-script.svg"
+        }
+      },
+      {
+        "command": "globalProjects.removeProjectScript",
+        "title": "Remove Script",
+        "icon": {
+          "light": "media/light/trash.svg",
+          "dark": "media/dark/trash.svg"
+        }
+      },
+      {
         "command": "globalProjects.removeItem",
         "title": "Remove",
         "icon": {
@@ -115,6 +139,14 @@
           "light": "media/light/refresh.svg",
           "dark": "media/dark/refresh.svg"
         }
+      },
+      {
+        "command": "globalProjects.exportConfiguration",
+        "title": "Project Manager: Export Configuration"
+      },
+      {
+        "command": "globalProjects.importConfiguration",
+        "title": "Project Manager: Import Configuration"
       },
       {
         "command": "globalProjects.cloneGroupWithNewBase",
@@ -236,8 +268,23 @@
           "group": "inline"
         },
         {
+          "command": "globalProjects.addProjectScript",
+          "when": "view == globalProjectsView && viewItem == project && globalProjects.editMode",
+          "group": "inline"
+        },
+        {
           "command": "globalProjects.cloneGroupWithNewBase",
           "when": "view == globalProjectsView && viewItem == group && globalProjects.editMode",
+          "group": "inline"
+        },
+        {
+          "command": "globalProjects.runProjectScript",
+          "when": "view == globalProjectsView && viewItem == script && !globalProjects.editMode",
+          "group": "inline@1"
+        },
+        {
+          "command": "globalProjects.removeProjectScript",
+          "when": "view == globalProjectsView && viewItem == script && globalProjects.editMode",
           "group": "inline"
         },
         {
@@ -248,7 +295,7 @@
       ]
     },
     "configuration": {
-      "title": "Global Projects",
+      "title": "Project Manager",
       "properties": {
         "globalProjects.clickAction": {
           "type": "string",

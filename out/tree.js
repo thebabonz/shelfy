@@ -33,7 +33,7 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.GlobalProjectsProvider = exports.ProjectItem = exports.GroupItem = void 0;
+exports.GlobalProjectsProvider = exports.ScriptItem = exports.ProjectItem = exports.GroupItem = void 0;
 const vscode = __importStar(require("vscode"));
 const projectColor_1 = require("./projectColor");
 const crypto = __importStar(require("crypto"));
@@ -53,13 +53,19 @@ class GroupItem extends vscode.TreeItem {
 }
 exports.GroupItem = GroupItem;
 class ProjectItem extends vscode.TreeItem {
-    constructor(project, iconPath, projectColor, showPath = true) {
-        super(project.name, vscode.TreeItemCollapsibleState.None);
+    constructor(project, iconPath, projectColor, showPath = true, editMode = false) {
+        const scriptCount = project.scripts?.length ?? 0;
+        super(project.name, scriptCount > 0
+            ? editMode
+                ? vscode.TreeItemCollapsibleState.Expanded
+                : vscode.TreeItemCollapsibleState.Collapsed
+            : vscode.TreeItemCollapsibleState.None);
         this.project = project;
         this.id = project.id;
         this.contextValue = "project";
         this.description = showPath ? project.projectPath : undefined;
-        this.tooltip = `${project.projectPath}${projectColor ? `\nColor: ${projectColor}` : ""}`;
+        const scriptSummary = scriptCount > 0 ? `\nScripts: ${scriptCount}` : "";
+        this.tooltip = `${project.projectPath}${projectColor ? `\nColor: ${projectColor}` : ""}${scriptSummary}`;
         this.command = {
             command: "globalProjects.openProjectFromRow",
             title: "Open Project",
@@ -69,6 +75,29 @@ class ProjectItem extends vscode.TreeItem {
     }
 }
 exports.ProjectItem = ProjectItem;
+class ScriptItem extends vscode.TreeItem {
+    constructor(project, script, editMode) {
+        super(script.kind === "package" ? script.scriptName : script.name, vscode.TreeItemCollapsibleState.None);
+        this.project = project;
+        this.script = script;
+        this.id = script.id;
+        this.contextValue = "script";
+        this.description = script.kind === "package" ? "package.json" : script.command;
+        this.tooltip =
+            script.kind === "package"
+                ? `Runs package.json script "${script.scriptName}"\n${project.projectPath}`
+                : `${script.command}\n${project.projectPath}`;
+        if (!editMode) {
+            this.command = {
+                command: "globalProjects.runProjectScript",
+                title: "Run Script",
+                arguments: [this]
+            };
+        }
+        this.iconPath = new vscode.ThemeIcon("terminal");
+    }
+}
+exports.ScriptItem = ScriptItem;
 class GlobalProjectsProvider {
     get dropMimeTypes() {
         return this.editMode ? ["application/vnd.code.tree.globalProjectsView"] : [];
@@ -121,6 +150,9 @@ class GlobalProjectsProvider {
         if (element instanceof GroupItem) {
             return this.toItems(element.group.children);
         }
+        if (element instanceof ProjectItem) {
+            return this.toScriptItems(element.project);
+        }
         return [];
     }
     async markExpanded(groupId) {
@@ -156,10 +188,13 @@ class GlobalProjectsProvider {
                 const showPath = vscode.workspace
                     .getConfiguration("globalProjects")
                     .get("showProjectPath", false);
-                items.push(new ProjectItem(node, iconPath, color, showPath));
+                items.push(new ProjectItem(node, iconPath, color, showPath, this.editMode));
             }
         }
         return items;
+    }
+    toScriptItems(project) {
+        return (project.scripts ?? []).map((script) => new ScriptItem(project, script, this.editMode));
     }
     sortNodes(nodes) {
         if (this.sortMode === "none") {
@@ -185,6 +220,9 @@ class GlobalProjectsProvider {
             return;
         }
         const item = source[0];
+        if (item instanceof ScriptItem) {
+            return;
+        }
         const payload = item instanceof GroupItem
             ? { nodeId: item.group.id, nodeKind: "group" }
             : { nodeId: item.project.id, nodeKind: "project" };
@@ -200,6 +238,9 @@ class GlobalProjectsProvider {
         }
         const raw = await item.asString();
         const payload = JSON.parse(raw);
+        if (target instanceof ScriptItem) {
+            return;
+        }
         if (target instanceof ProjectItem) {
             const targetPosition = this.findNodePosition(target.project.id);
             if (!targetPosition) {
