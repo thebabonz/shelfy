@@ -6,6 +6,7 @@ import { NewProjectScriptData, ProjectNodeData, ProjectScriptData } from "./mode
 import { PackageScriptOption, readPackageScripts, resolveProjectScriptCommand } from "./projectScripts";
 import { ProjectStore } from "./store";
 import { GlobalProjectsProvider, GroupItem, ProjectItem, ScriptItem, SortMode } from "./tree";
+import { getMoveDestinations } from "./treeBehavior";
 
 export async function activate(context: vscode.ExtensionContext): Promise<void> {
   await vscode.workspace.fs.createDirectory(context.globalStorageUri);
@@ -201,6 +202,10 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       }
     }),
 
+    vscode.commands.registerCommand("globalProjects.moveItemToFolder", async (item?: GroupItem | ProjectItem) => {
+      await moveItemToFolder(store, provider, item);
+    }),
+
     vscode.commands.registerCommand("globalProjects.openProject", async (item: ProjectItem) => {
       await openProjectInCurrentWindow(item);
     }),
@@ -327,6 +332,52 @@ async function createGroup(
 
   try {
     await store.addGroup(name, parentGroupId);
+    provider.refresh();
+  } catch (error) {
+    await vscode.window.showErrorMessage(asMessage(error));
+  }
+}
+
+async function moveItemToFolder(
+  store: ProjectStore,
+  provider: GlobalProjectsProvider,
+  item?: GroupItem | ProjectItem
+): Promise<void> {
+  if (!(item instanceof GroupItem) && !(item instanceof ProjectItem)) {
+    await vscode.window.showInformationMessage("Use Move to Folder from a Shelfy project or folder.");
+    return;
+  }
+
+  const nodeId = item instanceof GroupItem ? item.group.id : item.project.id;
+  const label = item instanceof GroupItem ? item.group.name : item.project.name;
+  const destinations = getMoveDestinations(store.read().children, nodeId);
+
+  if (destinations.length === 0) {
+    await vscode.window.showInformationMessage(`No available destination folders for "${label}".`);
+    return;
+  }
+
+  const picked = await vscode.window.showQuickPick(
+    destinations.map((destination) => ({
+      ...destination
+    })),
+    {
+      title: "Move to Folder",
+      placeHolder: `Choose a destination for "${label}"`
+    }
+  );
+
+  if (!picked) {
+    return;
+  }
+
+  try {
+    await store.moveNode(nodeId, picked.targetGroupId, picked.targetIndex);
+
+    if (picked.targetGroupId) {
+      await provider.markExpanded(picked.targetGroupId);
+    }
+
     provider.refresh();
   } catch (error) {
     await vscode.window.showErrorMessage(asMessage(error));

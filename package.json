@@ -109,6 +109,11 @@
         }
       },
       {
+        "command": "globalProjects.moveItemToFolder",
+        "title": "Move to Folder...",
+        "icon": "$(move)"
+      },
+      {
         "command": "globalProjects.openProject",
         "title": "Open Project",
         "icon": {
@@ -280,6 +285,11 @@
           "command": "globalProjects.cloneGroupWithNewBase",
           "when": "view == globalProjectsView && viewItem == group && globalProjects.editMode",
           "group": "inline"
+        },
+        {
+          "command": "globalProjects.moveItemToFolder",
+          "when": "view == globalProjectsView && (viewItem == group || viewItem == project) && globalProjects.editMode",
+          "group": "2_modification@1"
         },
         {
           "command": "globalProjects.runProjectScript",
