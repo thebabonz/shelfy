@@ -62,6 +62,10 @@ class ProjectStore {
     async write(data) {
         await this.context.globalState.update(STORAGE_KEY, data);
     }
+    getParentGroupId(nodeId) {
+        const result = findParentGroupIdForNode(this.read().children, nodeId);
+        return result.found ? result.parentId : undefined;
+    }
     async addGroup(name, parentGroupId) {
         const data = this.read();
         const group = {

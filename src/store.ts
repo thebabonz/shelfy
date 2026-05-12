@@ -38,6 +38,11 @@ export class ProjectStore {
     await this.context.globalState.update(STORAGE_KEY, data);
   }
 
+  getParentGroupId(nodeId: string): string | undefined {
+    const result = findParentGroupIdForNode(this.read().children, nodeId);
+    return result.found ? result.parentId : undefined;
+  }
+
   async addGroup(name: string, parentGroupId?: string): Promise<GroupNodeData> {
     const data = this.read();
     const group: GroupNodeData = {

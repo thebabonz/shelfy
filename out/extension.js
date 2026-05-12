@@ -99,7 +99,7 @@ async function activate(context) {
         }
         try {
             await store.addProject({
-                parentGroupId: target?.group.id,
+                parentGroupId: getAddProjectParentGroupId(store, target),
                 name,
                 projectPath
             });
@@ -429,6 +429,15 @@ async function promptForCustomScripts() {
             return scripts;
         }
     }
+}
+function getAddProjectParentGroupId(store, target) {
+    if (target instanceof tree_1.GroupItem) {
+        return target.group.id;
+    }
+    if (target instanceof tree_1.ProjectItem || target instanceof tree_1.ScriptItem) {
+        return store.getParentGroupId(target.project.id);
+    }
+    return undefined;
 }
 function getProjectScriptLabel(script) {
     return script.kind === "package" ? script.scriptName : script.name;

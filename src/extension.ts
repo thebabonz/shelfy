@@ -67,41 +67,44 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       await createGroup(store, provider, item.group.id);
     }),
 
-    vscode.commands.registerCommand("globalProjects.addProject", async (target?: GroupItem) => {
-      const picked = await vscode.window.showOpenDialog({
-        canSelectFiles: false,
-        canSelectFolders: true,
-        canSelectMany: false,
-        openLabel: "Add Project Folder"
-      });
-
-      if (!picked?.length) {
-        return;
-      }
-
-      const projectPath = picked[0].fsPath;
-      const defaultName = path.basename(projectPath);
-
-      const name = await vscode.window.showInputBox({
-        prompt: "Project display name",
-        value: defaultName
-      });
-
-      if (!name) {
-        return;
-      }
-
-      try {
-        await store.addProject({
-          parentGroupId: target?.group.id,
-          name,
-          projectPath
+    vscode.commands.registerCommand(
+      "globalProjects.addProject",
+      async (target?: GroupItem | ProjectItem | ScriptItem) => {
+        const picked = await vscode.window.showOpenDialog({
+          canSelectFiles: false,
+          canSelectFolders: true,
+          canSelectMany: false,
+          openLabel: "Add Project Folder"
         });
-        provider.refresh();
-      } catch (error) {
-        await vscode.window.showErrorMessage(asMessage(error));
+
+        if (!picked?.length) {
+          return;
+        }
+
+        const projectPath = picked[0].fsPath;
+        const defaultName = path.basename(projectPath);
+
+        const name = await vscode.window.showInputBox({
+          prompt: "Project display name",
+          value: defaultName
+        });
+
+        if (!name) {
+          return;
+        }
+
+        try {
+          await store.addProject({
+            parentGroupId: getAddProjectParentGroupId(store, target),
+            name,
+            projectPath
+          });
+          provider.refresh();
+        } catch (error) {
+          await vscode.window.showErrorMessage(asMessage(error));
+        }
       }
-    }),
+    ),
 
     vscode.commands.registerCommand("globalProjects.renameGroup", async (item: GroupItem) => {
       const name = await vscode.window.showInputBox({
@@ -546,6 +549,21 @@ async function promptForCustomScripts(): Promise<NewProjectScriptData[] | undefi
       return scripts;
     }
   }
+}
+
+function getAddProjectParentGroupId(
+  store: ProjectStore,
+  target?: GroupItem | ProjectItem | ScriptItem
+): string | undefined {
+  if (target instanceof GroupItem) {
+    return target.group.id;
+  }
+
+  if (target instanceof ProjectItem || target instanceof ScriptItem) {
+    return store.getParentGroupId(target.project.id);
+  }
+
+  return undefined;
 }
 
 function getProjectScriptLabel(script: ProjectScriptData): string {
