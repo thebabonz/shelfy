@@ -238,17 +238,17 @@
       "view/item/context": [
         {
           "command": "globalProjects.openProject",
-          "when": "view == globalProjectsView && viewItem == project && (globalProjects.clickAction == noAction || globalProjects.clickAction == openNewInstance)",
+          "when": "view == globalProjectsView && viewItem == project && !globalProjects.editMode && (globalProjects.clickAction == noAction || globalProjects.clickAction == openNewInstance)",
           "group": "inline@1"
         },
         {
           "command": "globalProjects.openProjectInNewWindow",
-          "when": "view == globalProjectsView && viewItem == project && (globalProjects.clickAction == noAction || globalProjects.clickAction == openSameInstance)",
+          "when": "view == globalProjectsView && viewItem == project && !globalProjects.editMode && (globalProjects.clickAction == noAction || globalProjects.clickAction == openSameInstance)",
           "group": "inline@2"
         },
         {
           "command": "globalProjects.openInExplorer",
-          "when": "view == globalProjectsView && viewItem == project",
+          "when": "view == globalProjectsView && viewItem == project && !globalProjects.editMode",
           "group": "inline@3"
         },
         {

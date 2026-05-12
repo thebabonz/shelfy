@@ -50,11 +50,15 @@ export class ProjectItem extends vscode.TreeItem {
     this.description = showPath ? project.projectPath : undefined;
     const scriptSummary = scriptCount > 0 ? `\nScripts: ${scriptCount}` : "";
     this.tooltip = `${project.projectPath}${projectColor ? `\nColor: ${projectColor}` : ""}${scriptSummary}`;
-    this.command = {
-      command: "globalProjects.openProjectFromRow",
-      title: "Open Project",
-      arguments: [this]
-    };
+
+    if (!editMode) {
+      this.command = {
+        command: "globalProjects.openProjectFromRow",
+        title: "Open Project",
+        arguments: [this]
+      };
+    }
+
     this.iconPath = iconPath;
   }
 }
