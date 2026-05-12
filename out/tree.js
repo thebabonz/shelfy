@@ -36,6 +36,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.GlobalProjectsProvider = exports.ScriptItem = exports.ProjectItem = exports.GroupItem = void 0;
 const vscode = __importStar(require("vscode"));
 const projectColor_1 = require("./projectColor");
+const treeBehavior_1 = require("./treeBehavior");
 const crypto = __importStar(require("crypto"));
 const fs = __importStar(require("fs/promises"));
 const path = __importStar(require("path"));
@@ -66,10 +67,10 @@ class ProjectItem extends vscode.TreeItem {
         this.description = showPath ? project.projectPath : undefined;
         const scriptSummary = scriptCount > 0 ? `\nScripts: ${scriptCount}` : "";
         this.tooltip = `${project.projectPath}${projectColor ? `\nColor: ${projectColor}` : ""}${scriptSummary}`;
-        if (!editMode) {
+        const command = (0, treeBehavior_1.getProjectRowCommandDefinition)(editMode);
+        if (command) {
             this.command = {
-                command: "globalProjects.openProjectFromRow",
-                title: "Open Project",
+                ...command,
                 arguments: [this]
             };
         }
@@ -102,10 +103,10 @@ class ScriptItem extends vscode.TreeItem {
 exports.ScriptItem = ScriptItem;
 class GlobalProjectsProvider {
     get dropMimeTypes() {
-        return this.editMode ? ["application/vnd.code.tree.globalProjectsView"] : [];
+        return (0, treeBehavior_1.getGlobalProjectsTreeMimeTypes)(this.editMode);
     }
     get dragMimeTypes() {
-        return this.editMode ? ["application/vnd.code.tree.globalProjectsView"] : [];
+        return (0, treeBehavior_1.getGlobalProjectsTreeMimeTypes)(this.editMode);
     }
     constructor(context, store) {
         this.context = context;
@@ -228,13 +229,13 @@ class GlobalProjectsProvider {
         const payload = item instanceof GroupItem
             ? { nodeId: item.group.id, nodeKind: "group" }
             : { nodeId: item.project.id, nodeKind: "project" };
-        dataTransfer.set("application/vnd.code.tree.globalProjectsView", new vscode.DataTransferItem(JSON.stringify(payload)));
+        dataTransfer.set(treeBehavior_1.GLOBAL_PROJECTS_TREE_MIME, new vscode.DataTransferItem(JSON.stringify(payload)));
     }
     async handleDrop(target, dataTransfer) {
         if (!this.editMode) {
             return;
         }
-        const item = dataTransfer.get("application/vnd.code.tree.globalProjectsView");
+        const item = dataTransfer.get(treeBehavior_1.GLOBAL_PROJECTS_TREE_MIME);
         if (!item) {
             return;
         }

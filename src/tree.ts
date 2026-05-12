@@ -2,6 +2,11 @@ import * as vscode from "vscode";
 import { GroupNodeData, NodeData, ProjectNodeData, ProjectScriptData } from "./model";
 import { readProjectColor } from "./projectColor";
 import { ProjectStore } from "./store";
+import {
+  getGlobalProjectsTreeMimeTypes,
+  getProjectRowCommandDefinition,
+  GLOBAL_PROJECTS_TREE_MIME
+} from "./treeBehavior";
 import * as crypto from "crypto";
 import * as fs from "fs/promises";
 import * as path from "path";
@@ -51,10 +56,10 @@ export class ProjectItem extends vscode.TreeItem {
     const scriptSummary = scriptCount > 0 ? `\nScripts: ${scriptCount}` : "";
     this.tooltip = `${project.projectPath}${projectColor ? `\nColor: ${projectColor}` : ""}${scriptSummary}`;
 
-    if (!editMode) {
+    const command = getProjectRowCommandDefinition(editMode);
+    if (command) {
       this.command = {
-        command: "globalProjects.openProjectFromRow",
-        title: "Open Project",
+        ...command,
         arguments: [this]
       };
     }
@@ -105,11 +110,11 @@ export class GlobalProjectsProvider
   readonly onDidChangeTreeData = this.emitter.event;
 
   get dropMimeTypes(): readonly string[] {
-    return this.editMode ? ["application/vnd.code.tree.globalProjectsView"] : [];
+    return getGlobalProjectsTreeMimeTypes(this.editMode);
   }
 
   get dragMimeTypes(): readonly string[] {
-    return this.editMode ? ["application/vnd.code.tree.globalProjectsView"] : [];
+    return getGlobalProjectsTreeMimeTypes(this.editMode);
   }
 
   private readonly colorCache = new Map<string, string | undefined>();
@@ -272,7 +277,7 @@ export class GlobalProjectsProvider
         : { nodeId: item.project.id, nodeKind: "project" };
 
     dataTransfer.set(
-      "application/vnd.code.tree.globalProjectsView",
+      GLOBAL_PROJECTS_TREE_MIME,
       new vscode.DataTransferItem(JSON.stringify(payload))
     );
   }
@@ -285,7 +290,7 @@ export class GlobalProjectsProvider
       return;
     }
 
-    const item = dataTransfer.get("application/vnd.code.tree.globalProjectsView");
+    const item = dataTransfer.get(GLOBAL_PROJECTS_TREE_MIME);
     if (!item) {
       return;
     }
