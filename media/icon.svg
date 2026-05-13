@@ -1,8 +1,31 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256" role="img" aria-label="Shelfy colored multifolder project manager icon">
-  <g fill="none" stroke-linecap="round" stroke-linejoin="round" stroke-width="10">
-    <path d="M88 62h48l15 15h56c11 0 19 8 19 19v80" stroke="#EF4444"/>
-    <path d="M74 78h50l15 15h62c11 0 19 8 19 19v80" stroke="#F59E0B"/>
-    <path d="M60 94h52l16 16h67c11 0 19 8 19 19v79" stroke="#10B981"/>
-    <path d="M46 111h54l17 17h72c11 0 19 8 19 19v56c0 11-8 19-19 19H46c-11 0-19-8-19-19v-73c0-11 8-19 19-19Z" stroke="#3B82F6"/>
+<svg width="256" height="256" xmlns="http://www.w3.org/2000/svg" xmlns:svg="http://www.w3.org/2000/svg" aria-label="Shelfy colored multifolder project manager icon with backplate">
+ <defs>
+  <!-- Reusable front folder shape -->
+  <path d="m46,111l54,0l17,17l72,0c11,0 19,8 19,19l0,56c0,11 -8,19 -19,19l-143,0c-11,0 -19,-8 -19,-19l0,-73c0,-11 8,-19 19,-19z" id="front-folder"/>
+  <!-- White = visible, black = cut out / transparent -->
+  <mask height="256" id="cut-front-folder" maskUnits="userSpaceOnUse" width="256" x="0" y="0">
+   <rect fill="white" height="256" id="svg_1" width="256"/>
+   <!-- This cuts the INSIDE of the blue folder from everything behind it -->
+   <use fill="black" href="#front-folder" id="svg_2" transform="translate(0 -4)"/>
+  </mask>
+ </defs>
+ <!-- Everything behind the blue folder is masked/cut -->
+ <!-- Draw the blue outline on top, not masked -->
+ <g class="layer" display="inline">
+  <g id="svg_4" mask="url(#cut-front-folder)" transform="matrix(1 0 0 1 0 0) matrix(1 0 0 1 0 0)">
+   <g fill="none" id="svg_5" stroke-linecap="round" stroke-linejoin="round" stroke-width="10" transform="translate(0 -4)">
+    <path d="m74,78l50,0l15,15l62,0c11,0 19,8 19,19l0,56c0,11 -8,19 -19,19" id="svg_7" stroke="#EF4444"/>
+    <path d="m60,94l52,0l16,16l67,0c11,0 19,8 19,19l0,56c0,0 0,19 -19,19" id="svg_8" stroke="#F59E0B"/>
+   </g>
   </g>
+  <g fill="none" id="svg_9" stroke-linecap="round" stroke-linejoin="round" stroke-width="10" transform="translate(0 -4)">
+   <use href="#front-folder" id="svg_10" stroke="#3B82F6"/>
+  </g>
+  <g fill="none" id="svg_11" stroke-linecap="round" stroke-linejoin="round" stroke-width="10" transform="translate(0 0) translate(0 -4)">
+   <use href="#front-folder" id="svg_12" stroke="#3B82F6"/>
+  </g>
+  <g fill="none" id="svg_13" stroke-linecap="round" stroke-linejoin="round" stroke-width="10" transform="matrix(1 0 0 1 0 0) matrix(1 0 0 1 0 0) translate(0 0) translate(0 0) translate(0 -4)">
+   <use href="#front-folder" id="svg_14" stroke="#3B82F6"/>
+  </g>
+ </g>
 </svg>
