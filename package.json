@@ -311,7 +311,7 @@
     "configuration": {
       "title": "Shelfy",
       "properties": {
-        "globalProjects.clickAction": {
+        "shelfy.clickAction": {
           "type": "string",
           "enum": [
             "noAction",
@@ -321,10 +321,27 @@
           "default": "openSameInstance",
           "markdownDescription": "Action for click on a project row."
         },
-        "globalProjects.showProjectPath": {
+        "shelfy.showProjectPath": {
           "type": "boolean",
           "default": false,
           "description": "Show the folder path below the project name in the tree view."
+        },
+        "globalProjects.clickAction": {
+          "type": "string",
+          "enum": [
+            "noAction",
+            "openSameInstance",
+            "openNewInstance"
+          ],
+          "default": "openSameInstance",
+          "markdownDescription": "Action for click on a project row.",
+          "deprecationMessage": "Deprecated. Use `shelfy.clickAction` instead."
+        },
+        "globalProjects.showProjectPath": {
+          "type": "boolean",
+          "default": false,
+          "description": "Show the folder path below the project name in the tree view.",
+          "deprecationMessage": "Deprecated. Use `shelfy.showProjectPath` instead."
         }
       }
     }
