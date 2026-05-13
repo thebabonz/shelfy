@@ -1,6 +1,0 @@
-<svg width="24" height="24" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" fill="none">
-  <!-- Back folder -->
-  <path d="M2 7.5H7L8.5 9H17V15.5C17 16.3284 16.3284 17 15.5 17H3.5C2.6716 17 2 16.3284 2 15.5V7.5Z" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" opacity="0.45"/>
-  <!-- Front folder -->
-  <path d="M6 10H12.5L14.2 12H22V19.5C22 20.3284 21.3284 21 20.5 21H7.5C6.6716 21 6 20.3284 6 19.5V10Z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-</svg>

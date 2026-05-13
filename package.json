@@ -2,11 +2,11 @@
   "name": "shelfy",
   "displayName": "Shelfy",
   "description": "Save project directories globally and organize them in virtual folders.",
-  "version": "0.0.35",
+  "version": "0.0.37",
   "publisher": "TheBabonz",
   "repository": {
     "type": "git",
-    "url": "https://github.com/thebabonz/project-manager.git"
+    "url": "https://github.com/thebabonz/shelfy.git"
   },
   "engines": {
     "vscode": "^1.90.0"
@@ -15,14 +15,14 @@
     "Other"
   ],
   "main": "./out/extension.js",
-  "icon": "media/projects.png",
+  "icon": "media/icon-256.png",
   "contributes": {
     "viewsContainers": {
       "activitybar": [
         {
           "id": "globalProjects",
           "title": "Shelfy",
-          "icon": "media/projects.svg"
+          "icon": "media/activitybar/icon.svg"
         }
       ]
     },
@@ -31,7 +31,7 @@
         {
           "id": "globalProjectsView",
           "name": "Shelfy",
-          "icon": "media/projects.svg"
+          "icon": "media/activitybar/icon.svg"
         }
       ]
     },

@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16" role="img" aria-label="Shelfy multifolder menu icon for light theme">
+  <g fill="none" stroke="#424242" stroke-width="1.1" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M5.2 2.7h3.35l.9.9h3.9c.62 0 1.05.43 1.05 1.05v4.8"/>
+    <path d="M4.0 4.35h3.55l.9.9h4.45c.62 0 1.05.43 1.05 1.05v5.05"/>
+    <path d="M2.7 6.1h3.72l.96.96h5.08c.62 0 1.05.43 1.05 1.05v4.02c0 .62-.43 1.05-1.05 1.05H2.7c-.62 0-1.05-.43-1.05-1.05V7.15c0-.62.43-1.05 1.05-1.05Z"/>
+  </g>
+</svg>

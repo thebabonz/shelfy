@@ -24,7 +24,7 @@ or Peacock workspace color:
 
 ## 📸 Preview
 
-> Add a screenshot here later (optional)
+> I will add a screenshot here later (maybe)
 
 ---
 

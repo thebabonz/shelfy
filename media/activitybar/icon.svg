@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" role="img" aria-label="Shelfy activity bar multifolder icon">
+  <g fill="none" stroke="currentColor" stroke-width="1.55" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M7.8 4.2h5.0l1.35 1.35h5.6c.8 0 1.35.55 1.35 1.35v7.2"/>
+    <path d="M5.9 6.7h5.3l1.35 1.35h6.55c.8 0 1.35.55 1.35 1.35v7.6"/>
+    <path d="M4.0 9.3h5.55l1.45 1.45h7.45c.8 0 1.35.55 1.35 1.35v6.05c0 .8-.55 1.35-1.35 1.35H4.0c-.8 0-1.35-.55-1.35-1.35v-7.5c0-.8.55-1.35 1.35-1.35Z"/>
+  </g>
+</svg>

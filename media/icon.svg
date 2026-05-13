@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256" role="img" aria-label="Shelfy colored multifolder project manager icon">
+  <g fill="none" stroke-linecap="round" stroke-linejoin="round" stroke-width="10">
+    <path d="M88 62h48l15 15h56c11 0 19 8 19 19v80" stroke="#EF4444"/>
+    <path d="M74 78h50l15 15h62c11 0 19 8 19 19v80" stroke="#F59E0B"/>
+    <path d="M60 94h52l16 16h67c11 0 19 8 19 19v79" stroke="#10B981"/>
+    <path d="M46 111h54l17 17h72c11 0 19 8 19 19v56c0 11-8 19-19 19H46c-11 0-19-8-19-19v-73c0-11 8-19 19-19Z" stroke="#3B82F6"/>
+  </g>
+</svg>
