@@ -35,6 +35,7 @@ var __importStar = (this && this.__importStar) || (function () {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.GlobalProjectsProvider = exports.ScriptItem = exports.ProjectItem = exports.GroupItem = void 0;
 const vscode = __importStar(require("vscode"));
+const config_1 = require("./config");
 const projectColor_1 = require("./projectColor");
 const treeBehavior_1 = require("./treeBehavior");
 const crypto = __importStar(require("crypto"));
@@ -188,9 +189,7 @@ class GlobalProjectsProvider {
                 const iconPath = color
                     ? await getOrCreateColorIcon(this.context, color)
                     : new vscode.ThemeIcon("folder");
-                const showPath = vscode.workspace
-                    .getConfiguration("globalProjects")
-                    .get("showProjectPath", false);
+                const showPath = (0, config_1.getShelfySetting)("showProjectPath", false);
                 items.push(new ProjectItem(node, iconPath, color, showPath, this.editMode));
             }
         }

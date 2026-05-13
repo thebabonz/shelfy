@@ -39,6 +39,7 @@ const jsonc_parser_1 = require("jsonc-parser");
 const os = __importStar(require("os"));
 const path = __importStar(require("path"));
 const vscode = __importStar(require("vscode"));
+const config_1 = require("./config");
 const projectScripts_1 = require("./projectScripts");
 const store_1 = require("./store");
 const tree_1 = require("./tree");
@@ -51,24 +52,54 @@ async function activate(context) {
     await vscode.commands.executeCommand("setContext", "globalProjects.editMode", false);
     await vscode.commands.executeCommand("setContext", "globalProjects.sortMode", provider.getSortMode());
     await setEffectiveClickActionContext();
-    const treeView = vscode.window.createTreeView("globalProjectsView", {
-        treeDataProvider: provider,
-        dragAndDropController: provider,
-        showCollapseAll: true
+    let editMode = false;
+    let treeViewDisposables = [];
+    const registerTreeView = () => {
+        for (const disposable of treeViewDisposables) {
+            disposable.dispose();
+        }
+        const treeViewOptions = {
+            treeDataProvider: provider,
+            showCollapseAll: true
+        };
+        if ((0, treeBehavior_1.getGlobalProjectsTreeMimeTypes)(editMode).length > 0) {
+            treeViewOptions.dragAndDropController = provider;
+        }
+        const treeView = vscode.window.createTreeView("globalProjectsView", treeViewOptions);
+        treeViewDisposables = [
+            treeView,
+            treeView.onDidExpandElement(async (event) => {
+                if (event.element instanceof tree_1.GroupItem) {
+                    await provider.markExpanded(event.element.group.id);
+                }
+            }),
+            treeView.onDidCollapseElement(async (event) => {
+                if (event.element instanceof tree_1.GroupItem) {
+                    await provider.markCollapsed(event.element.group.id);
+                }
+            })
+        ];
+    };
+    const setEditMode = async (enabled) => {
+        editMode = enabled;
+        await vscode.commands.executeCommand("setContext", "globalProjects.editMode", enabled);
+        provider.setEditMode(enabled);
+        registerTreeView();
+    };
+    registerTreeView();
+    context.subscriptions.push({
+        dispose: () => {
+            for (const disposable of treeViewDisposables) {
+                disposable.dispose();
+            }
+        }
     });
-    context.subscriptions.push(treeView);
-    context.subscriptions.push(treeView.onDidExpandElement(async (event) => {
-        if (event.element instanceof tree_1.GroupItem) {
-            await provider.markExpanded(event.element.group.id);
-        }
-    }), treeView.onDidCollapseElement(async (event) => {
-        if (event.element instanceof tree_1.GroupItem) {
-            await provider.markCollapsed(event.element.group.id);
-        }
-    }));
     context.subscriptions.push(vscode.workspace.onDidChangeConfiguration(async (event) => {
-        if (event.affectsConfiguration("globalProjects.clickAction")) {
+        if ((0, config_1.affectsShelfySetting)(event, "clickAction")) {
             await setEffectiveClickActionContext();
+        }
+        if ((0, config_1.affectsShelfySetting)(event, "showProjectPath")) {
+            provider.refresh();
         }
     }));
     context.subscriptions.push(vscode.commands.registerCommand("globalProjects.refresh", () => provider.refresh()), vscode.commands.registerCommand("globalProjects.exportConfiguration", async () => {
@@ -217,11 +248,9 @@ async function activate(context) {
             await vscode.window.showErrorMessage(asMessage(error));
         }
     }), vscode.commands.registerCommand("globalProjects.enableEditMode", async () => {
-        await vscode.commands.executeCommand("setContext", "globalProjects.editMode", true);
-        provider.setEditMode(true);
+        await setEditMode(true);
     }), vscode.commands.registerCommand("globalProjects.disableEditMode", async () => {
-        await vscode.commands.executeCommand("setContext", "globalProjects.editMode", false);
-        provider.setEditMode(false);
+        await setEditMode(false);
     }), vscode.commands.registerCommand("globalProjects.cycleSortFromNone", async () => {
         await cycleSortMode(provider, "asc");
     }), vscode.commands.registerCommand("globalProjects.cycleSortFromAsc", async () => {
@@ -251,8 +280,7 @@ async function openProjectInNewWindow(item) {
     });
 }
 function getClickAction() {
-    const config = vscode.workspace.getConfiguration("globalProjects");
-    return config.get("clickAction", "openSameInstance");
+    return (0, config_1.getShelfySetting)("clickAction", "openSameInstance");
 }
 async function setEffectiveClickActionContext() {
     await vscode.commands.executeCommand("setContext", "globalProjects.clickAction", getClickAction());

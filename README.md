@@ -52,7 +52,7 @@ or Peacock workspace color:
 
 ### Open a project
 
-- Click a project row → behavior is controlled by `globalProjects.clickAction`
+- Click a project row → behavior is controlled by `shelfy.clickAction`
 - Use inline actions to open in current window or new window directly
 
 ### Import or export configuration
@@ -62,11 +62,17 @@ or Peacock workspace color:
 
 ### Configure click behavior
 
-Set `globalProjects.clickAction` in VS Code settings:
+Set `shelfy.clickAction` in VS Code settings:
 
 - `noAction`: clicking a row does nothing
 - `openSameInstance` (default): clicking a row opens in current window
 - `openNewInstance`: clicking a row opens in a new window
+
+Optional setting:
+
+- `shelfy.showProjectPath`: shows the folder path below the project name in the tree view
+
+Legacy `globalProjects.*` settings are still supported for existing installs.
 
 ---
 

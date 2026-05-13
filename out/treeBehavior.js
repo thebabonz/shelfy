@@ -5,10 +5,10 @@ exports.getGlobalProjectsTreeMimeTypes = getGlobalProjectsTreeMimeTypes;
 exports.getProjectRowCommandDefinition = getProjectRowCommandDefinition;
 exports.getMoveDestinations = getMoveDestinations;
 exports.GLOBAL_PROJECTS_TREE_MIME = "application/vnd.code.tree.globalProjectsView";
-function getGlobalProjectsTreeMimeTypes(_editMode) {
-    // VS Code reads tree drag/drop MIME types when the controller is registered.
-    // The handlers still enforce edit mode before doing any work.
-    return [exports.GLOBAL_PROJECTS_TREE_MIME];
+function getGlobalProjectsTreeMimeTypes(editMode) {
+    // VS Code snapshots tree drag/drop MIME types when the controller is
+    // registered, so edit-mode toggles recreate the tree view.
+    return editMode ? [exports.GLOBAL_PROJECTS_TREE_MIME] : [];
 }
 function getProjectRowCommandDefinition(editMode) {
     if (editMode) {

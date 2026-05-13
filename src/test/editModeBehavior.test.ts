@@ -12,6 +12,9 @@ import {
 
 function readManifest(): {
   contributes: {
+    configuration: {
+      properties: Record<string, { deprecationMessage?: string }>;
+    };
     menus: {
       "view/item/context": Array<{ command: string; when?: string }>;
     };
@@ -64,8 +67,8 @@ function createTree(): NodeData[] {
   ];
 }
 
-test("drag and drop mime types are advertised outside edit mode", () => {
-  assert.deepEqual(getGlobalProjectsTreeMimeTypes(false), [GLOBAL_PROJECTS_TREE_MIME]);
+test("drag and drop mime types are disabled outside edit mode", () => {
+  assert.deepEqual(getGlobalProjectsTreeMimeTypes(false), []);
 });
 
 test("drag and drop mime types are enabled in edit mode", () => {
@@ -144,4 +147,16 @@ test("manifest shows move action only for projects and folders in edit mode", ()
   assert.match(menuItem.when ?? "", /viewItem == group/);
   assert.match(menuItem.when ?? "", /viewItem == project/);
   assert.doesNotMatch(menuItem.when ?? "", /viewItem == script/);
+});
+
+test("manifest contributes shelfy settings and deprecates legacy aliases", () => {
+  const properties = readManifest().contributes.configuration.properties;
+
+  assert.ok(properties["shelfy.clickAction"]);
+  assert.ok(properties["shelfy.showProjectPath"]);
+  assert.match(properties["globalProjects.clickAction"]?.deprecationMessage ?? "", /shelfy\.clickAction/);
+  assert.match(
+    properties["globalProjects.showProjectPath"]?.deprecationMessage ?? "",
+    /shelfy\.showProjectPath/
+  );
 });

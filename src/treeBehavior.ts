@@ -14,10 +14,10 @@ export type MoveDestination = {
   targetIndex: number;
 };
 
-export function getGlobalProjectsTreeMimeTypes(_editMode: boolean): readonly string[] {
-  // VS Code reads tree drag/drop MIME types when the controller is registered.
-  // The handlers still enforce edit mode before doing any work.
-  return [GLOBAL_PROJECTS_TREE_MIME];
+export function getGlobalProjectsTreeMimeTypes(editMode: boolean): readonly string[] {
+  // VS Code snapshots tree drag/drop MIME types when the controller is
+  // registered, so edit-mode toggles recreate the tree view.
+  return editMode ? [GLOBAL_PROJECTS_TREE_MIME] : [];
 }
 
 export function getProjectRowCommandDefinition(

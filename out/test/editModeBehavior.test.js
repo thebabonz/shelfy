@@ -87,8 +87,8 @@ function createTree() {
         }
     ];
 }
-(0, node_test_1.default)("drag and drop mime types are advertised outside edit mode", () => {
-    strict_1.default.deepEqual((0, treeBehavior_1.getGlobalProjectsTreeMimeTypes)(false), [treeBehavior_1.GLOBAL_PROJECTS_TREE_MIME]);
+(0, node_test_1.default)("drag and drop mime types are disabled outside edit mode", () => {
+    strict_1.default.deepEqual((0, treeBehavior_1.getGlobalProjectsTreeMimeTypes)(false), []);
 });
 (0, node_test_1.default)("drag and drop mime types are enabled in edit mode", () => {
     strict_1.default.deepEqual((0, treeBehavior_1.getGlobalProjectsTreeMimeTypes)(true), [treeBehavior_1.GLOBAL_PROJECTS_TREE_MIME]);
@@ -141,5 +141,12 @@ function createTree() {
     strict_1.default.match(menuItem.when ?? "", /viewItem == group/);
     strict_1.default.match(menuItem.when ?? "", /viewItem == project/);
     strict_1.default.doesNotMatch(menuItem.when ?? "", /viewItem == script/);
+});
+(0, node_test_1.default)("manifest contributes shelfy settings and deprecates legacy aliases", () => {
+    const properties = readManifest().contributes.configuration.properties;
+    strict_1.default.ok(properties["shelfy.clickAction"]);
+    strict_1.default.ok(properties["shelfy.showProjectPath"]);
+    strict_1.default.match(properties["globalProjects.clickAction"]?.deprecationMessage ?? "", /shelfy\.clickAction/);
+    strict_1.default.match(properties["globalProjects.showProjectPath"]?.deprecationMessage ?? "", /shelfy\.showProjectPath/);
 });
 //# sourceMappingURL=editModeBehavior.test.js.map

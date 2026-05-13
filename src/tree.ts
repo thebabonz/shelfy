@@ -1,4 +1,5 @@
 import * as vscode from "vscode";
+import { getShelfySetting } from "./config";
 import { GroupNodeData, NodeData, ProjectNodeData, ProjectScriptData } from "./model";
 import { readProjectColor } from "./projectColor";
 import { ProjectStore } from "./store";
@@ -218,9 +219,7 @@ export class GlobalProjectsProvider
         const iconPath = color
           ? await getOrCreateColorIcon(this.context, color)
           : new vscode.ThemeIcon("folder");
-        const showPath = vscode.workspace
-          .getConfiguration("globalProjects")
-          .get<boolean>("showProjectPath", false);
+        const showPath = getShelfySetting<boolean>("showProjectPath", false);
 
         items.push(new ProjectItem(node, iconPath, color, showPath, this.editMode));
       }
