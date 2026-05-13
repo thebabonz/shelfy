@@ -45,8 +45,50 @@ function readManifest() {
     const manifestPath = path.resolve(__dirname, "..", "..", "package.json");
     return JSON.parse(fs.readFileSync(manifestPath, "utf8"));
 }
-(0, node_test_1.default)("drag and drop mime types are disabled outside edit mode", () => {
-    strict_1.default.deepEqual((0, treeBehavior_1.getGlobalProjectsTreeMimeTypes)(false), []);
+function createTree() {
+    return [
+        {
+            kind: "group",
+            id: "frontend",
+            name: "Frontend",
+            children: [
+                {
+                    kind: "project",
+                    id: "web-app",
+                    name: "Web App",
+                    projectPath: "C:\\projects\\web-app"
+                },
+                {
+                    kind: "group",
+                    id: "components",
+                    name: "Components",
+                    children: [
+                        {
+                            kind: "group",
+                            id: "buttons",
+                            name: "Buttons",
+                            children: []
+                        }
+                    ]
+                }
+            ]
+        },
+        {
+            kind: "group",
+            id: "backend",
+            name: "Backend",
+            children: []
+        },
+        {
+            kind: "project",
+            id: "root-tool",
+            name: "Root Tool",
+            projectPath: "C:\\projects\\root-tool"
+        }
+    ];
+}
+(0, node_test_1.default)("drag and drop mime types are advertised outside edit mode", () => {
+    strict_1.default.deepEqual((0, treeBehavior_1.getGlobalProjectsTreeMimeTypes)(false), [treeBehavior_1.GLOBAL_PROJECTS_TREE_MIME]);
 });
 (0, node_test_1.default)("drag and drop mime types are enabled in edit mode", () => {
     strict_1.default.deepEqual((0, treeBehavior_1.getGlobalProjectsTreeMimeTypes)(true), [treeBehavior_1.GLOBAL_PROJECTS_TREE_MIME]);
@@ -70,5 +112,34 @@ function readManifest() {
         strict_1.default.ok(menuItem, `Expected to find menu contribution for ${command}`);
         strict_1.default.match(menuItem.when ?? "", /!globalProjects\.editMode/);
     }
+});
+(0, node_test_1.default)("project move destinations include folders other than its current parent", () => {
+    const destinations = (0, treeBehavior_1.getMoveDestinations)(createTree(), "root-tool");
+    strict_1.default.deepEqual(destinations.map((destination) => destination.targetGroupId), ["frontend", "components", "buttons", "backend"]);
+    strict_1.default.equal(destinations.some((destination) => destination.targetGroupId === undefined), false);
+});
+(0, node_test_1.default)("project inside a folder can move to root", () => {
+    const destinations = (0, treeBehavior_1.getMoveDestinations)(createTree(), "web-app");
+    strict_1.default.ok(destinations.some((destination) => destination.targetGroupId === undefined));
+    strict_1.default.equal(destinations.some((destination) => destination.targetGroupId === "frontend"), false);
+});
+(0, node_test_1.default)("folder cannot move into itself or descendants", () => {
+    const destinations = (0, treeBehavior_1.getMoveDestinations)(createTree(), "frontend");
+    strict_1.default.deepEqual(destinations.map((destination) => destination.targetGroupId), ["backend"]);
+});
+(0, node_test_1.default)("root and current parent no-op move destinations are excluded", () => {
+    const rootProjectDestinations = (0, treeBehavior_1.getMoveDestinations)(createTree(), "root-tool");
+    const nestedProjectDestinations = (0, treeBehavior_1.getMoveDestinations)(createTree(), "web-app");
+    strict_1.default.equal(rootProjectDestinations.some((destination) => destination.targetGroupId === undefined), false);
+    strict_1.default.equal(nestedProjectDestinations.some((destination) => destination.targetGroupId === "frontend"), false);
+});
+(0, node_test_1.default)("manifest shows move action only for projects and folders in edit mode", () => {
+    const menuItems = readManifest().contributes.menus["view/item/context"];
+    const menuItem = menuItems.find((item) => item.command === "globalProjects.moveItemToFolder");
+    strict_1.default.ok(menuItem, "Expected to find menu contribution for globalProjects.moveItemToFolder");
+    strict_1.default.match(menuItem.when ?? "", /globalProjects\.editMode/);
+    strict_1.default.match(menuItem.when ?? "", /viewItem == group/);
+    strict_1.default.match(menuItem.when ?? "", /viewItem == project/);
+    strict_1.default.doesNotMatch(menuItem.when ?? "", /viewItem == script/);
 });
 //# sourceMappingURL=editModeBehavior.test.js.map

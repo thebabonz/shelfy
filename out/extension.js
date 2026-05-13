@@ -42,6 +42,7 @@ const vscode = __importStar(require("vscode"));
 const projectScripts_1 = require("./projectScripts");
 const store_1 = require("./store");
 const tree_1 = require("./tree");
+const treeBehavior_1 = require("./treeBehavior");
 async function activate(context) {
     await vscode.workspace.fs.createDirectory(context.globalStorageUri);
     const store = new store_1.ProjectStore(context);
@@ -179,6 +180,8 @@ async function activate(context) {
         catch (error) {
             await vscode.window.showErrorMessage(asMessage(error));
         }
+    }), vscode.commands.registerCommand("globalProjects.moveItemToFolder", async (item) => {
+        await moveItemToFolder(store, provider, item);
     }), vscode.commands.registerCommand("globalProjects.openProject", async (item) => {
         await openProjectInCurrentWindow(item);
     }), vscode.commands.registerCommand("globalProjects.openProjectInNewWindow", async (item) => {
@@ -263,6 +266,38 @@ async function createGroup(store, provider, parentGroupId) {
     }
     try {
         await store.addGroup(name, parentGroupId);
+        provider.refresh();
+    }
+    catch (error) {
+        await vscode.window.showErrorMessage(asMessage(error));
+    }
+}
+async function moveItemToFolder(store, provider, item) {
+    if (!(item instanceof tree_1.GroupItem) && !(item instanceof tree_1.ProjectItem)) {
+        await vscode.window.showInformationMessage("Use Move to Folder from a Shelfy project or folder.");
+        return;
+    }
+    const nodeId = item instanceof tree_1.GroupItem ? item.group.id : item.project.id;
+    const label = item instanceof tree_1.GroupItem ? item.group.name : item.project.name;
+    const destinations = (0, treeBehavior_1.getMoveDestinations)(store.read().children, nodeId);
+    if (destinations.length === 0) {
+        await vscode.window.showInformationMessage(`No available destination folders for "${label}".`);
+        return;
+    }
+    const picked = await vscode.window.showQuickPick(destinations.map((destination) => ({
+        ...destination
+    })), {
+        title: "Move to Folder",
+        placeHolder: `Choose a destination for "${label}"`
+    });
+    if (!picked) {
+        return;
+    }
+    try {
+        await store.moveNode(nodeId, picked.targetGroupId, picked.targetIndex);
+        if (picked.targetGroupId) {
+            await provider.markExpanded(picked.targetGroupId);
+        }
         provider.refresh();
     }
     catch (error) {
