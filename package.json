@@ -2,7 +2,7 @@
   "name": "shelfy",
   "displayName": "Shelfy",
   "description": "Save project directories globally and organize them in virtual folders.",
-  "version": "0.0.35",
+  "version": "0.0.36",
   "publisher": "TheBabonz",
   "repository": {
     "type": "git",
