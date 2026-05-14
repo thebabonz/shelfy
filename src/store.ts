@@ -9,15 +9,18 @@ import {
   ProjectScriptData,
   RootData
 } from "./model";
+import { addProjectScriptsToProject, updateProjectScriptInProject } from "./projectScriptState";
 
-const STORAGE_KEY = "globalProjects.data.v2";
+const STORAGE_KEY = "shelfy.data.v2";
+const LEGACY_STORAGE_KEY = "globalProjects.data.v2";
 
 export class ProjectStore {
   constructor(private readonly context: vscode.ExtensionContext) {}
 
   read(): RootData {
     return (
-      this.context.globalState.get<RootData>(STORAGE_KEY) ?? {
+      this.context.globalState.get<RootData>(STORAGE_KEY) ??
+      this.context.globalState.get<RootData>(LEGACY_STORAGE_KEY) ?? {
         version: 2,
         children: []
       }
@@ -128,34 +131,27 @@ export class ProjectStore {
       throw new Error("Project not found.");
     }
 
-    const projectScripts = project.scripts ?? (project.scripts = []);
-    const added: ProjectScriptData[] = [];
-
-    for (const script of scripts) {
-      if (hasMatchingProjectScript(projectScripts, script)) {
-        continue;
-      }
-
-      const nextScript: ProjectScriptData =
-        script.kind === "package"
-          ? {
-              kind: "package",
-              id: crypto.randomUUID(),
-              scriptName: script.scriptName
-            }
-          : {
-              kind: "custom",
-              id: crypto.randomUUID(),
-              name: script.name,
-              command: script.command
-            };
-
-      projectScripts.push(nextScript);
-      added.push(nextScript);
-    }
+    const added = addProjectScriptsToProject(project, scripts);
 
     await this.write(data);
     return added;
+  }
+
+  async updateProjectScript(
+    projectId: string,
+    scriptId: string,
+    nextScript: NewProjectScriptData
+  ): Promise<ProjectScriptData> {
+    const data = this.read();
+    const project = findProjectById(data.children, projectId);
+    if (!project) {
+      throw new Error("Project not found.");
+    }
+
+    const updated = updateProjectScriptInProject(project, scriptId, nextScript);
+
+    await this.write(data);
+    return updated;
   }
 
   async removeProjectScript(projectId: string, scriptId: string): Promise<void> {
@@ -433,21 +429,6 @@ function cloneProjectScript(script: ProjectScriptData): ProjectScriptData {
         name: script.name,
         command: script.command
       };
-}
-
-function hasMatchingProjectScript(
-  existingScripts: ProjectScriptData[],
-  nextScript: NewProjectScriptData
-): boolean {
-  if (nextScript.kind === "package") {
-    return existingScripts.some(
-      (script) => script.kind === "package" && script.scriptName === nextScript.scriptName
-    );
-  }
-
-  return existingScripts.some((script) => {
-    return script.kind === "custom" && script.command === nextScript.command;
-  });
 }
 
 function findParentGroupIdForNode(

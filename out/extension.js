@@ -44,16 +44,32 @@ const projectScripts_1 = require("./projectScripts");
 const store_1 = require("./store");
 const tree_1 = require("./tree");
 const treeBehavior_1 = require("./treeBehavior");
+function registerShelfyCommand(command, callback) {
+    const legacyCommand = command.replace(/^shelfy\./, "globalProjects.");
+    return [
+        vscode.commands.registerCommand(command, callback),
+        vscode.commands.registerCommand(legacyCommand, (...args) => vscode.commands.executeCommand(command, ...args))
+    ];
+}
 async function activate(context) {
     await vscode.workspace.fs.createDirectory(context.globalStorageUri);
     const store = new store_1.ProjectStore(context);
-    const provider = new tree_1.GlobalProjectsProvider(context, store);
+    const provider = new tree_1.ShelfyProvider(context, store);
     await provider.initialize();
-    await vscode.commands.executeCommand("setContext", "globalProjects.editMode", false);
-    await vscode.commands.executeCommand("setContext", "globalProjects.sortMode", provider.getSortMode());
+    await vscode.commands.executeCommand("setContext", "shelfy.editMode", false);
+    await vscode.commands.executeCommand("setContext", "shelfy.sortMode", provider.getSortMode());
     await setEffectiveClickActionContext();
+    await setFilterContext(provider);
     let editMode = false;
+    let treeView;
     let treeViewDisposables = [];
+    const updateTreeViewState = () => {
+        if (treeView) {
+            treeView.message = provider.getFilterText()
+                ? `Filter: ${provider.getFilterText()}`
+                : undefined;
+        }
+    };
     const registerTreeView = () => {
         for (const disposable of treeViewDisposables) {
             disposable.dispose();
@@ -62,10 +78,11 @@ async function activate(context) {
             treeDataProvider: provider,
             showCollapseAll: true
         };
-        if ((0, treeBehavior_1.getGlobalProjectsTreeMimeTypes)(editMode).length > 0) {
+        if ((0, treeBehavior_1.getShelfyTreeMimeTypes)(editMode).length > 0) {
             treeViewOptions.dragAndDropController = provider;
         }
-        const treeView = vscode.window.createTreeView("globalProjectsView", treeViewOptions);
+        treeView = vscode.window.createTreeView("shelfyView", treeViewOptions);
+        updateTreeViewState();
         treeViewDisposables = [
             treeView,
             treeView.onDidExpandElement(async (event) => {
@@ -82,7 +99,7 @@ async function activate(context) {
     };
     const setEditMode = async (enabled) => {
         editMode = enabled;
-        await vscode.commands.executeCommand("setContext", "globalProjects.editMode", enabled);
+        await vscode.commands.executeCommand("setContext", "shelfy.editMode", enabled);
         provider.setEditMode(enabled);
         registerTreeView();
     };
@@ -102,15 +119,32 @@ async function activate(context) {
             provider.refresh();
         }
     }));
-    context.subscriptions.push(vscode.commands.registerCommand("globalProjects.refresh", () => provider.refresh()), vscode.commands.registerCommand("globalProjects.exportConfiguration", async () => {
+    context.subscriptions.push(...registerShelfyCommand("shelfy.refresh", () => provider.refresh()), ...registerShelfyCommand("shelfy.setFilter", async () => {
+        const filterText = await vscode.window.showInputBox({
+            title: "Filter Shelfy tree",
+            prompt: "Filter folders, projects, paths, and scripts",
+            value: provider.getFilterText(),
+            placeHolder: "frontend, api, npm run dev"
+        });
+        if (filterText === undefined) {
+            return;
+        }
+        await provider.setFilterText(filterText);
+        updateTreeViewState();
+        await setFilterContext(provider);
+    }), ...registerShelfyCommand("shelfy.clearFilter", async () => {
+        await provider.setFilterText(undefined);
+        updateTreeViewState();
+        await setFilterContext(provider);
+    }), ...registerShelfyCommand("shelfy.exportConfiguration", async () => {
         await exportConfiguration(store);
-    }), vscode.commands.registerCommand("globalProjects.importConfiguration", async () => {
+    }), ...registerShelfyCommand("shelfy.importConfiguration", async () => {
         await importConfiguration(store, provider);
-    }), vscode.commands.registerCommand("globalProjects.addRootGroup", async () => {
+    }), ...registerShelfyCommand("shelfy.addRootGroup", async () => {
         await createGroup(store, provider);
-    }), vscode.commands.registerCommand("globalProjects.addSubgroup", async (item) => {
+    }), ...registerShelfyCommand("shelfy.addSubgroup", async (item) => {
         await createGroup(store, provider, item.group.id);
-    }), vscode.commands.registerCommand("globalProjects.addProject", async (target) => {
+    }), ...registerShelfyCommand("shelfy.addProject", async (target) => {
         const picked = await vscode.window.showOpenDialog({
             canSelectFiles: false,
             canSelectFolders: true,
@@ -140,7 +174,7 @@ async function activate(context) {
         catch (error) {
             await vscode.window.showErrorMessage(asMessage(error));
         }
-    }), vscode.commands.registerCommand("globalProjects.renameGroup", async (item) => {
+    }), ...registerShelfyCommand("shelfy.renameGroup", async (item) => {
         const name = await vscode.window.showInputBox({
             prompt: "New folder name",
             value: item.group.name
@@ -155,7 +189,7 @@ async function activate(context) {
         catch (error) {
             await vscode.window.showErrorMessage(asMessage(error));
         }
-    }), vscode.commands.registerCommand("globalProjects.renameProject", async (item) => {
+    }), ...registerShelfyCommand("shelfy.renameProject", async (item) => {
         const name = await vscode.window.showInputBox({
             prompt: "New project name",
             value: item.project.name
@@ -170,9 +204,11 @@ async function activate(context) {
         catch (error) {
             await vscode.window.showErrorMessage(asMessage(error));
         }
-    }), vscode.commands.registerCommand("globalProjects.addProjectScript", async (item) => {
+    }), ...registerShelfyCommand("shelfy.addProjectScript", async (item) => {
         await addProjectScript(store, provider, item);
-    }), vscode.commands.registerCommand("globalProjects.removeProjectScript", async (item) => {
+    }), ...registerShelfyCommand("shelfy.editProjectScript", async (item) => {
+        await editProjectScript(store, provider, item);
+    }), ...registerShelfyCommand("shelfy.removeProjectScript", async (item) => {
         const label = getProjectScriptLabel(item.script);
         const answer = await vscode.window.showWarningMessage(`Remove script "${label}"?`, { modal: true }, "Remove");
         if (answer !== "Remove") {
@@ -185,7 +221,7 @@ async function activate(context) {
         catch (error) {
             await vscode.window.showErrorMessage(asMessage(error));
         }
-    }), vscode.commands.registerCommand("globalProjects.runProjectScript", async (item) => {
+    }), ...registerShelfyCommand("shelfy.runProjectScript", async (item) => {
         try {
             const command = await (0, projectScripts_1.resolveProjectScriptCommand)(item.project.projectPath, item.script);
             const terminal = vscode.window.createTerminal({
@@ -198,7 +234,7 @@ async function activate(context) {
         catch (error) {
             await vscode.window.showErrorMessage(asMessage(error));
         }
-    }), vscode.commands.registerCommand("globalProjects.removeItem", async (item) => {
+    }), ...registerShelfyCommand("shelfy.removeItem", async (item) => {
         const label = item instanceof tree_1.GroupItem ? item.group.name : item.project.name;
         const answer = await vscode.window.showWarningMessage(`Remove "${label}"?`, { modal: true }, "Remove");
         if (answer !== "Remove") {
@@ -211,17 +247,17 @@ async function activate(context) {
         catch (error) {
             await vscode.window.showErrorMessage(asMessage(error));
         }
-    }), vscode.commands.registerCommand("globalProjects.moveItemToFolder", async (item) => {
+    }), ...registerShelfyCommand("shelfy.moveItemToFolder", async (item) => {
         await moveItemToFolder(store, provider, item);
-    }), vscode.commands.registerCommand("globalProjects.openProject", async (item) => {
+    }), ...registerShelfyCommand("shelfy.openProject", async (item) => {
         await openProjectInCurrentWindow(item);
-    }), vscode.commands.registerCommand("globalProjects.openProjectInNewWindow", async (item) => {
+    }), ...registerShelfyCommand("shelfy.openProjectInNewWindow", async (item) => {
         await openProjectInNewWindow(item);
-    }), vscode.commands.registerCommand("globalProjects.openInExplorer", async (item) => {
+    }), ...registerShelfyCommand("shelfy.openInExplorer", async (item) => {
         await vscode.commands.executeCommand("revealFileInOS", vscode.Uri.file(item.project.projectPath));
-    }), vscode.commands.registerCommand("globalProjects.openProjectFromRow", async (item) => {
+    }), ...registerShelfyCommand("shelfy.openProjectFromRow", async (item) => {
         await openProjectFromRow(item);
-    }), vscode.commands.registerCommand("globalProjects.cloneGroupWithNewBase", async (item) => {
+    }), ...registerShelfyCommand("shelfy.cloneGroupWithNewBase", async (item) => {
         const picked = await vscode.window.showOpenDialog({
             canSelectFiles: false,
             canSelectFolders: true,
@@ -247,15 +283,15 @@ async function activate(context) {
         catch (error) {
             await vscode.window.showErrorMessage(asMessage(error));
         }
-    }), vscode.commands.registerCommand("globalProjects.enableEditMode", async () => {
+    }), ...registerShelfyCommand("shelfy.enableEditMode", async () => {
         await setEditMode(true);
-    }), vscode.commands.registerCommand("globalProjects.disableEditMode", async () => {
+    }), ...registerShelfyCommand("shelfy.disableEditMode", async () => {
         await setEditMode(false);
-    }), vscode.commands.registerCommand("globalProjects.cycleSortFromNone", async () => {
+    }), ...registerShelfyCommand("shelfy.cycleSortFromNone", async () => {
         await cycleSortMode(provider, "asc");
-    }), vscode.commands.registerCommand("globalProjects.cycleSortFromAsc", async () => {
+    }), ...registerShelfyCommand("shelfy.cycleSortFromAsc", async () => {
         await cycleSortMode(provider, "desc");
-    }), vscode.commands.registerCommand("globalProjects.cycleSortFromDesc", async () => {
+    }), ...registerShelfyCommand("shelfy.cycleSortFromDesc", async () => {
         await cycleSortMode(provider, "none");
     }));
 }
@@ -283,7 +319,10 @@ function getClickAction() {
     return (0, config_1.getShelfySetting)("clickAction", "openSameInstance");
 }
 async function setEffectiveClickActionContext() {
-    await vscode.commands.executeCommand("setContext", "globalProjects.clickAction", getClickAction());
+    await vscode.commands.executeCommand("setContext", "shelfy.clickAction", getClickAction());
+}
+async function setFilterContext(provider) {
+    await vscode.commands.executeCommand("setContext", "shelfy.hasFilter", provider.hasFilter());
 }
 async function createGroup(store, provider, parentGroupId) {
     const name = await vscode.window.showInputBox({
@@ -405,10 +444,32 @@ async function addProjectScript(store, provider, item) {
         await vscode.window.showErrorMessage(asMessage(error));
     }
 }
-async function getAvailablePackageScripts(project) {
+async function editProjectScript(store, provider, item) {
+    const nextScript = await promptForProjectScriptUpdate(item.project, item.script);
+    if (!nextScript) {
+        return;
+    }
+    try {
+        await store.updateProjectScript(item.project.id, item.script.id, nextScript);
+        provider.refresh();
+    }
+    catch (error) {
+        await vscode.window.showErrorMessage(asMessage(error));
+    }
+}
+async function promptForProjectScriptUpdate(project, script) {
+    if (script.kind === "package") {
+        return promptForPackageScriptUpdate(project, script.scriptName);
+    }
+    return promptForCustomScriptUpdate(script.name, script.command);
+}
+async function getAvailablePackageScripts(project, includedScriptName) {
     const configured = new Set((project.scripts ?? [])
         .filter((script) => script.kind === "package")
         .map((script) => script.scriptName));
+    if (includedScriptName) {
+        configured.delete(includedScriptName);
+    }
     try {
         const packageScripts = await (0, projectScripts_1.readPackageScripts)(project.projectPath);
         return packageScripts.filter((script) => !configured.has(script.name));
@@ -438,6 +499,28 @@ async function pickScriptSource(hasPackageScripts) {
     });
     return picked?.value;
 }
+async function promptForPackageScriptUpdate(project, currentScriptName) {
+    const packageScripts = await getAvailablePackageScripts(project, currentScriptName);
+    if (packageScripts.length === 0) {
+        await vscode.window.showInformationMessage("No package.json scripts are available to select.");
+        return undefined;
+    }
+    const picked = await vscode.window.showQuickPick(packageScripts.map((script) => ({
+        label: script.name,
+        description: script.command,
+        detail: script.name === currentScriptName ? "Current selection" : undefined
+    })), {
+        title: "Edit package.json script",
+        placeHolder: `Select the script to store for "${project.name}"`
+    });
+    if (!picked) {
+        return undefined;
+    }
+    return {
+        kind: "package",
+        scriptName: picked.label
+    };
+}
 async function pickPackageScripts(packageScripts) {
     if (packageScripts.length === 0) {
         await vscode.window.showInformationMessage("No new package.json scripts are available to add.");
@@ -459,21 +542,44 @@ async function pickPackageScripts(packageScripts) {
         scriptName: script.label
     }));
 }
+async function promptForCustomScriptUpdate(currentName, currentCommand) {
+    const name = await promptForRequiredInput({
+        prompt: "Script label",
+        placeHolder: "API dev server",
+        value: currentName
+    });
+    if (name === undefined) {
+        return undefined;
+    }
+    const command = await promptForRequiredInput({
+        prompt: "Command to run in the project folder",
+        placeHolder: "npm run dev",
+        value: currentCommand
+    });
+    if (command === undefined) {
+        return undefined;
+    }
+    return {
+        kind: "custom",
+        name,
+        command
+    };
+}
 async function promptForCustomScripts() {
     const scripts = [];
     while (true) {
-        const name = await vscode.window.showInputBox({
+        const name = await promptForRequiredInput({
             prompt: "Script label",
             placeHolder: "API dev server"
         });
-        if (!name) {
+        if (name === undefined) {
             return scripts.length > 0 ? scripts : undefined;
         }
-        const command = await vscode.window.showInputBox({
+        const command = await promptForRequiredInput({
             prompt: "Command to run in the project folder",
             placeHolder: "npm run dev"
         });
-        if (!command) {
+        if (command === undefined) {
             return scripts.length > 0 ? scripts : undefined;
         }
         scripts.push({
@@ -493,6 +599,15 @@ async function promptForCustomScripts() {
         }
     }
 }
+async function promptForRequiredInput(options) {
+    const value = await vscode.window.showInputBox({
+        prompt: options.prompt,
+        placeHolder: options.placeHolder,
+        value: options.value,
+        validateInput: (input) => (input.trim().length > 0 ? undefined : "A value is required.")
+    });
+    return value === undefined ? undefined : value.trim();
+}
 function getAddProjectParentGroupId(store, target) {
     if (target instanceof tree_1.GroupItem) {
         return target.group.id;
@@ -510,6 +625,6 @@ function asMessage(error) {
 }
 async function cycleSortMode(provider, nextMode) {
     await provider.setSortMode(nextMode);
-    await vscode.commands.executeCommand("setContext", "globalProjects.sortMode", nextMode);
+    await vscode.commands.executeCommand("setContext", "shelfy.sortMode", nextMode);
 }
 //# sourceMappingURL=extension.js.map

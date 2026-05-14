@@ -4,10 +4,11 @@ import { GroupNodeData, NodeData, ProjectNodeData, ProjectScriptData } from "./m
 import { readProjectColor } from "./projectColor";
 import { ProjectStore } from "./store";
 import {
-  getGlobalProjectsTreeMimeTypes,
+  getShelfyTreeMimeTypes,
   getProjectRowCommandDefinition,
-  GLOBAL_PROJECTS_TREE_MIME
+  SHELFY_TREE_MIME
 } from "./treeBehavior";
+import { filterTreeNodes, hasActiveTreeFilter, normalizeTreeFilterText } from "./treeFilter";
 import * as crypto from "crypto";
 import * as fs from "fs/promises";
 import * as path from "path";
@@ -19,8 +20,12 @@ type DragPayload = {
 
 export type SortMode = "none" | "asc" | "desc";
 
-const EXPANDED_GROUPS_KEY = "globalProjects.expandedGroups";
-const SORT_MODE_KEY = "globalProjects.sortMode";
+const EXPANDED_GROUPS_KEY = "shelfy.expandedGroups";
+const LEGACY_EXPANDED_GROUPS_KEY = "globalProjects.expandedGroups";
+const SORT_MODE_KEY = "shelfy.sortMode";
+const LEGACY_SORT_MODE_KEY = "globalProjects.sortMode";
+const FILTER_TEXT_KEY = "shelfy.filterText";
+const LEGACY_FILTER_TEXT_KEY = "globalProjects.filterText";
 
 export class GroupItem extends vscode.TreeItem {
   constructor(public readonly group: GroupNodeData) {
@@ -38,14 +43,15 @@ export class ProjectItem extends vscode.TreeItem {
     iconPath: vscode.ThemeIcon | vscode.Uri,
     projectColor?: string,
     showPath = true,
-    editMode = false
+    editMode = false,
+    expandScripts = editMode
   ) {
     const scriptCount = project.scripts?.length ?? 0;
 
     super(
       project.name,
       scriptCount > 0
-        ? editMode
+        ? expandScripts
           ? vscode.TreeItemCollapsibleState.Expanded
           : vscode.TreeItemCollapsibleState.Collapsed
         : vscode.TreeItemCollapsibleState.None
@@ -90,7 +96,7 @@ export class ScriptItem extends vscode.TreeItem {
 
     if (!editMode) {
       this.command = {
-        command: "globalProjects.runProjectScript",
+        command: "shelfy.runProjectScript",
         title: "Run Script",
         arguments: [this]
       };
@@ -100,7 +106,7 @@ export class ScriptItem extends vscode.TreeItem {
   }
 }
 
-export class GlobalProjectsProvider
+export class ShelfyProvider
   implements
     vscode.TreeDataProvider<GroupItem | ProjectItem | ScriptItem>,
     vscode.TreeDragAndDropController<GroupItem | ProjectItem | ScriptItem>
@@ -111,11 +117,11 @@ export class GlobalProjectsProvider
   readonly onDidChangeTreeData = this.emitter.event;
 
   get dropMimeTypes(): readonly string[] {
-    return getGlobalProjectsTreeMimeTypes(this.editMode);
+    return getShelfyTreeMimeTypes(this.editMode);
   }
 
   get dragMimeTypes(): readonly string[] {
-    return getGlobalProjectsTreeMimeTypes(this.editMode);
+    return getShelfyTreeMimeTypes(this.editMode);
   }
 
   private readonly colorCache = new Map<string, string | undefined>();
@@ -123,17 +129,28 @@ export class GlobalProjectsProvider
   private readonly expandedGroupIds = new Set<string>();
   private editMode = false;
   private sortMode: SortMode = "none";
+  private filterText: string | undefined;
 
   constructor(
     private readonly context: vscode.ExtensionContext,
     private readonly store: ProjectStore
   ) {
-    const saved = this.context.workspaceState.get<string[]>(EXPANDED_GROUPS_KEY, []);
+    const saved = this.context.workspaceState.get<string[]>(
+      EXPANDED_GROUPS_KEY,
+      this.context.workspaceState.get<string[]>(LEGACY_EXPANDED_GROUPS_KEY, [])
+    );
     for (const id of saved) {
       this.expandedGroupIds.add(id);
     }
 
-    this.sortMode = this.context.workspaceState.get<SortMode>(SORT_MODE_KEY, "none");
+    this.sortMode = this.context.workspaceState.get<SortMode>(
+      SORT_MODE_KEY,
+      this.context.workspaceState.get<SortMode>(LEGACY_SORT_MODE_KEY, "none")
+    );
+    this.filterText = normalizeTreeFilterText(
+      this.context.workspaceState.get<string>(FILTER_TEXT_KEY) ??
+        this.context.workspaceState.get<string>(LEGACY_FILTER_TEXT_KEY)
+    );
   }
 
   async initialize(): Promise<void> {
@@ -154,9 +171,28 @@ export class GlobalProjectsProvider
     return this.sortMode;
   }
 
+  getFilterText(): string | undefined {
+    return this.filterText;
+  }
+
+  hasFilter(): boolean {
+    return hasActiveTreeFilter(this.filterText);
+  }
+
   async setSortMode(mode: SortMode): Promise<void> {
     this.sortMode = mode;
     await this.context.workspaceState.update(SORT_MODE_KEY, mode);
+    this.emitter.fire();
+  }
+
+  async setFilterText(filterText: string | undefined): Promise<void> {
+    const normalized = normalizeTreeFilterText(filterText);
+    if (normalized === this.filterText) {
+      return;
+    }
+
+    this.filterText = normalized;
+    await this.context.workspaceState.update(FILTER_TEXT_KEY, normalized);
     this.emitter.fire();
   }
 
@@ -168,7 +204,7 @@ export class GlobalProjectsProvider
     element?: GroupItem | ProjectItem | ScriptItem
   ): Promise<Array<GroupItem | ProjectItem | ScriptItem>> {
     if (!element) {
-      return this.toItems(this.store.read().children);
+      return this.toItems(filterTreeNodes(this.store.read().children, this.filterText));
     }
 
     if (element instanceof GroupItem) {
@@ -206,11 +242,12 @@ export class GlobalProjectsProvider
   private async toItems(nodes: NodeData[]): Promise<Array<GroupItem | ProjectItem>> {
     const items: Array<GroupItem | ProjectItem> = [];
     const nodesToRender = this.sortNodes(nodes);
+    const expandForFilter = this.hasFilter();
 
     for (const node of nodesToRender) {
       if (node.kind === "group") {
         const item = new GroupItem(node);
-        item.collapsibleState = this.expandedGroupIds.has(node.id)
+        item.collapsibleState = expandForFilter || this.expandedGroupIds.has(node.id)
           ? vscode.TreeItemCollapsibleState.Expanded
           : vscode.TreeItemCollapsibleState.Collapsed;
         items.push(item);
@@ -221,7 +258,7 @@ export class GlobalProjectsProvider
           : new vscode.ThemeIcon("folder");
         const showPath = getShelfySetting<boolean>("showProjectPath", false);
 
-        items.push(new ProjectItem(node, iconPath, color, showPath, this.editMode));
+        items.push(new ProjectItem(node, iconPath, color, showPath, this.editMode, this.editMode || expandForFilter));
       }
     }
 
@@ -276,7 +313,7 @@ export class GlobalProjectsProvider
         : { nodeId: item.project.id, nodeKind: "project" };
 
     dataTransfer.set(
-      GLOBAL_PROJECTS_TREE_MIME,
+      SHELFY_TREE_MIME,
       new vscode.DataTransferItem(JSON.stringify(payload))
     );
   }
@@ -289,7 +326,7 @@ export class GlobalProjectsProvider
       return;
     }
 
-    const item = dataTransfer.get(GLOBAL_PROJECTS_TREE_MIME);
+    const item = dataTransfer.get(SHELFY_TREE_MIME);
     if (!item) {
       return;
     }

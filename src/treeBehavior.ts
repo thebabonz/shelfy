@@ -1,9 +1,9 @@
 import { GroupNodeData, NodeData } from "./model";
 
-export const GLOBAL_PROJECTS_TREE_MIME = "application/vnd.code.tree.globalProjectsView";
+export const SHELFY_TREE_MIME = "application/vnd.code.tree.shelfyView";
 
 export type ProjectRowCommandDefinition = {
-  command: "globalProjects.openProjectFromRow";
+  command: "shelfy.openProjectFromRow";
   title: "Open Project";
 };
 
@@ -14,10 +14,10 @@ export type MoveDestination = {
   targetIndex: number;
 };
 
-export function getGlobalProjectsTreeMimeTypes(editMode: boolean): readonly string[] {
+export function getShelfyTreeMimeTypes(editMode: boolean): readonly string[] {
   // VS Code snapshots tree drag/drop MIME types when the controller is
   // registered, so edit-mode toggles recreate the tree view.
-  return editMode ? [GLOBAL_PROJECTS_TREE_MIME] : [];
+  return editMode ? [SHELFY_TREE_MIME] : [];
 }
 
 export function getProjectRowCommandDefinition(
@@ -28,7 +28,7 @@ export function getProjectRowCommandDefinition(
   }
 
   return {
-    command: "globalProjects.openProjectFromRow",
+    command: "shelfy.openProjectFromRow",
     title: "Open Project"
   };
 }

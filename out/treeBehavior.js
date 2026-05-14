@@ -1,21 +1,21 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.GLOBAL_PROJECTS_TREE_MIME = void 0;
-exports.getGlobalProjectsTreeMimeTypes = getGlobalProjectsTreeMimeTypes;
+exports.SHELFY_TREE_MIME = void 0;
+exports.getShelfyTreeMimeTypes = getShelfyTreeMimeTypes;
 exports.getProjectRowCommandDefinition = getProjectRowCommandDefinition;
 exports.getMoveDestinations = getMoveDestinations;
-exports.GLOBAL_PROJECTS_TREE_MIME = "application/vnd.code.tree.globalProjectsView";
-function getGlobalProjectsTreeMimeTypes(editMode) {
+exports.SHELFY_TREE_MIME = "application/vnd.code.tree.shelfyView";
+function getShelfyTreeMimeTypes(editMode) {
     // VS Code snapshots tree drag/drop MIME types when the controller is
     // registered, so edit-mode toggles recreate the tree view.
-    return editMode ? [exports.GLOBAL_PROJECTS_TREE_MIME] : [];
+    return editMode ? [exports.SHELFY_TREE_MIME] : [];
 }
 function getProjectRowCommandDefinition(editMode) {
     if (editMode) {
         return undefined;
     }
     return {
-        command: "globalProjects.openProjectFromRow",
+        command: "shelfy.openProjectFromRow",
         title: "Open Project"
     };
 }

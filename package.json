@@ -2,7 +2,7 @@
   "name": "shelfy",
   "displayName": "Shelfy",
   "description": "Save project directories globally and organize them in virtual folders.",
-  "version": "0.0.41",
+  "version": "0.0.46",
   "publisher": "TheBabonz",
   "repository": {
     "type": "git",
@@ -20,16 +20,16 @@
     "viewsContainers": {
       "activitybar": [
         {
-          "id": "globalProjects",
+          "id": "shelfy",
           "title": "Shelfy",
           "icon": "media/activitybar/icon.svg"
         }
       ]
     },
     "views": {
-      "globalProjects": [
+      "shelfy": [
         {
-          "id": "globalProjectsView",
+          "id": "shelfyView",
           "name": "Shelfy",
           "icon": "media/activitybar/icon.svg"
         }
@@ -37,7 +37,7 @@
     },
     "commands": [
       {
-        "command": "globalProjects.addProject",
+        "command": "shelfy.addProject",
         "title": "Add Project",
         "icon": {
           "light": "media/light/add-project.svg",
@@ -45,7 +45,7 @@
         }
       },
       {
-        "command": "globalProjects.addRootGroup",
+        "command": "shelfy.addRootGroup",
         "title": "Add Folder",
         "icon": {
           "light": "media/light/add-folder.svg",
@@ -53,7 +53,7 @@
         }
       },
       {
-        "command": "globalProjects.addSubgroup",
+        "command": "shelfy.addSubgroup",
         "title": "Add Subfolder",
         "icon": {
           "light": "media/light/add-folder.svg",
@@ -61,7 +61,7 @@
         }
       },
       {
-        "command": "globalProjects.renameGroup",
+        "command": "shelfy.renameGroup",
         "title": "Rename Folder",
         "icon": {
           "light": "media/light/edit.svg",
@@ -69,7 +69,7 @@
         }
       },
       {
-        "command": "globalProjects.renameProject",
+        "command": "shelfy.renameProject",
         "title": "Rename Project",
         "icon": {
           "light": "media/light/edit.svg",
@@ -77,7 +77,7 @@
         }
       },
       {
-        "command": "globalProjects.addProjectScript",
+        "command": "shelfy.addProjectScript",
         "title": "Add Script",
         "icon": {
           "light": "media/light/add-script.svg",
@@ -85,7 +85,15 @@
         }
       },
       {
-        "command": "globalProjects.runProjectScript",
+        "command": "shelfy.editProjectScript",
+        "title": "Edit Script",
+        "icon": {
+          "light": "media/light/edit.svg",
+          "dark": "media/dark/edit.svg"
+        }
+      },
+      {
+        "command": "shelfy.runProjectScript",
         "title": "Run Script",
         "icon": {
           "light": "media/light/run-script.svg",
@@ -93,7 +101,7 @@
         }
       },
       {
-        "command": "globalProjects.removeProjectScript",
+        "command": "shelfy.removeProjectScript",
         "title": "Remove Script",
         "icon": {
           "light": "media/light/trash.svg",
@@ -101,7 +109,7 @@
         }
       },
       {
-        "command": "globalProjects.removeItem",
+        "command": "shelfy.removeItem",
         "title": "Remove",
         "icon": {
           "light": "media/light/trash.svg",
@@ -109,12 +117,12 @@
         }
       },
       {
-        "command": "globalProjects.moveItemToFolder",
+        "command": "shelfy.moveItemToFolder",
         "title": "Move to Folder...",
         "icon": "$(move)"
       },
       {
-        "command": "globalProjects.openProject",
+        "command": "shelfy.openProject",
         "title": "Open Project",
         "icon": {
           "light": "media/light/open-project.svg",
@@ -122,7 +130,7 @@
         }
       },
       {
-        "command": "globalProjects.openProjectInNewWindow",
+        "command": "shelfy.openProjectInNewWindow",
         "title": "Open in New Window",
         "icon": {
           "light": "media/light/open-project-new-window.svg",
@@ -130,7 +138,7 @@
         }
       },
       {
-        "command": "globalProjects.openInExplorer",
+        "command": "shelfy.openInExplorer",
         "title": "Open in Explorer",
         "icon": {
           "light": "media/light/open-explorer.svg",
@@ -138,11 +146,11 @@
         }
       },
       {
-        "command": "globalProjects.openProjectFromRow",
+        "command": "shelfy.openProjectFromRow",
         "title": "Open Project (Row Click)"
       },
       {
-        "command": "globalProjects.refresh",
+        "command": "shelfy.refresh",
         "title": "Refresh",
         "icon": {
           "light": "media/light/refresh.svg",
@@ -150,30 +158,40 @@
         }
       },
       {
-        "command": "globalProjects.exportConfiguration",
+        "command": "shelfy.setFilter",
+        "title": "Filter Projects",
+        "icon": "$(search)"
+      },
+      {
+        "command": "shelfy.clearFilter",
+        "title": "Clear Filter",
+        "icon": "$(close)"
+      },
+      {
+        "command": "shelfy.exportConfiguration",
         "title": "Shelfy: Export Configuration"
       },
       {
-        "command": "globalProjects.importConfiguration",
+        "command": "shelfy.importConfiguration",
         "title": "Shelfy: Import Configuration"
       },
       {
-        "command": "globalProjects.cloneGroupWithNewBase",
+        "command": "shelfy.cloneGroupWithNewBase",
         "title": "Clone with New Base Path",
         "icon": "$(copy)"
       },
       {
-        "command": "globalProjects.enableEditMode",
+        "command": "shelfy.enableEditMode",
         "title": "Enable Edit Mode",
         "icon": "$(edit)"
       },
       {
-        "command": "globalProjects.disableEditMode",
+        "command": "shelfy.disableEditMode",
         "title": "Disable Edit Mode",
         "icon": "$(lock)"
       },
       {
-        "command": "globalProjects.cycleSortFromNone",
+        "command": "shelfy.cycleSortFromNone",
         "title": "Sort: None",
         "icon": {
           "light": "media/light/sort-none.svg",
@@ -181,7 +199,7 @@
         }
       },
       {
-        "command": "globalProjects.cycleSortFromAsc",
+        "command": "shelfy.cycleSortFromAsc",
         "title": "Sort: Ascending",
         "icon": {
           "light": "media/light/sort-asc.svg",
@@ -189,7 +207,7 @@
         }
       },
       {
-        "command": "globalProjects.cycleSortFromDesc",
+        "command": "shelfy.cycleSortFromDesc",
         "title": "Sort: Descending",
         "icon": {
           "light": "media/light/sort-desc.svg",
@@ -200,110 +218,125 @@
     "menus": {
       "view/title": [
         {
-          "command": "globalProjects.enableEditMode",
-          "when": "view == globalProjectsView && !globalProjects.editMode",
+          "command": "shelfy.enableEditMode",
+          "when": "view == shelfyView && !shelfy.editMode",
           "group": "navigation@1"
         },
         {
-          "command": "globalProjects.disableEditMode",
-          "when": "view == globalProjectsView && globalProjects.editMode",
+          "command": "shelfy.disableEditMode",
+          "when": "view == shelfyView && shelfy.editMode",
           "group": "navigation@1"
         },
         {
-          "command": "globalProjects.addRootGroup",
-          "when": "view == globalProjectsView && globalProjects.editMode",
+          "command": "shelfy.addRootGroup",
+          "when": "view == shelfyView && shelfy.editMode",
           "group": "navigation@2"
         },
         {
-          "command": "globalProjects.addProject",
-          "when": "view == globalProjectsView && globalProjects.editMode",
+          "command": "shelfy.addProject",
+          "when": "view == shelfyView && shelfy.editMode",
           "group": "navigation@3"
         },
         {
-          "command": "globalProjects.refresh",
-          "when": "view == globalProjectsView",
+          "command": "shelfy.refresh",
+          "when": "view == shelfyView",
           "group": "navigation@4"
         },
         {
-          "command": "globalProjects.cycleSortFromNone",
-          "when": "view == globalProjectsView && globalProjects.sortMode == none",
+          "command": "shelfy.setFilter",
+          "when": "view == shelfyView",
           "group": "navigation@5"
         },
         {
-          "command": "globalProjects.cycleSortFromAsc",
-          "when": "view == globalProjectsView && globalProjects.sortMode == asc",
-          "group": "navigation@5"
+          "command": "shelfy.clearFilter",
+          "when": "view == shelfyView && shelfy.hasFilter",
+          "group": "navigation@6"
         },
         {
-          "command": "globalProjects.cycleSortFromDesc",
-          "when": "view == globalProjectsView && globalProjects.sortMode == desc",
-          "group": "navigation@5"
+          "command": "shelfy.cycleSortFromNone",
+          "when": "view == shelfyView && shelfy.sortMode == none",
+          "group": "navigation@7"
+        },
+        {
+          "command": "shelfy.cycleSortFromAsc",
+          "when": "view == shelfyView && shelfy.sortMode == asc",
+          "group": "navigation@7"
+        },
+        {
+          "command": "shelfy.cycleSortFromDesc",
+          "when": "view == shelfyView && shelfy.sortMode == desc",
+          "group": "navigation@7"
         }
       ],
       "view/item/context": [
         {
-          "command": "globalProjects.openProject",
-          "when": "view == globalProjectsView && viewItem == project && !globalProjects.editMode && (globalProjects.clickAction == noAction || globalProjects.clickAction == openNewInstance)",
+          "command": "shelfy.openProject",
+          "when": "view == shelfyView && viewItem == project && !shelfy.editMode && (shelfy.clickAction == noAction || shelfy.clickAction == openNewInstance)",
           "group": "inline@1"
         },
         {
-          "command": "globalProjects.openProjectInNewWindow",
-          "when": "view == globalProjectsView && viewItem == project && !globalProjects.editMode && (globalProjects.clickAction == noAction || globalProjects.clickAction == openSameInstance)",
+          "command": "shelfy.openProjectInNewWindow",
+          "when": "view == shelfyView && viewItem == project && !shelfy.editMode && (shelfy.clickAction == noAction || shelfy.clickAction == openSameInstance)",
           "group": "inline@2"
         },
         {
-          "command": "globalProjects.openInExplorer",
-          "when": "view == globalProjectsView && viewItem == project && !globalProjects.editMode",
+          "command": "shelfy.openInExplorer",
+          "when": "view == shelfyView && viewItem == project && !shelfy.editMode",
           "group": "inline@3"
         },
         {
-          "command": "globalProjects.addProject",
-          "when": "view == globalProjectsView && viewItem == group && globalProjects.editMode",
+          "command": "shelfy.addProject",
+          "when": "view == shelfyView && viewItem == group && shelfy.editMode",
           "group": "inline"
         },
         {
-          "command": "globalProjects.addSubgroup",
-          "when": "view == globalProjectsView && viewItem == group && globalProjects.editMode",
+          "command": "shelfy.addSubgroup",
+          "when": "view == shelfyView && viewItem == group && shelfy.editMode",
           "group": "inline"
         },
         {
-          "command": "globalProjects.renameGroup",
-          "when": "view == globalProjectsView && viewItem == group && globalProjects.editMode",
+          "command": "shelfy.renameGroup",
+          "when": "view == shelfyView && viewItem == group && shelfy.editMode",
           "group": "inline"
         },
         {
-          "command": "globalProjects.renameProject",
-          "when": "view == globalProjectsView && viewItem == project && globalProjects.editMode",
+          "command": "shelfy.renameProject",
+          "when": "view == shelfyView && viewItem == project && shelfy.editMode",
           "group": "inline"
         },
         {
-          "command": "globalProjects.addProjectScript",
-          "when": "view == globalProjectsView && viewItem == project && globalProjects.editMode",
+          "command": "shelfy.addProjectScript",
+          "when": "view == shelfyView && viewItem == project && shelfy.editMode",
           "group": "inline"
         },
         {
-          "command": "globalProjects.cloneGroupWithNewBase",
-          "when": "view == globalProjectsView && viewItem == group && globalProjects.editMode",
+          "command": "shelfy.cloneGroupWithNewBase",
+          "when": "view == shelfyView && viewItem == group && shelfy.editMode",
           "group": "inline"
         },
         {
-          "command": "globalProjects.moveItemToFolder",
-          "when": "view == globalProjectsView && (viewItem == group || viewItem == project) && globalProjects.editMode",
+          "command": "shelfy.moveItemToFolder",
+          "when": "view == shelfyView && (viewItem == group || viewItem == project) && shelfy.editMode",
           "group": "2_modification@1"
         },
         {
-          "command": "globalProjects.runProjectScript",
-          "when": "view == globalProjectsView && viewItem == script && !globalProjects.editMode",
+          "command": "shelfy.runProjectScript",
+          "when": "view == shelfyView && viewItem == script && !shelfy.editMode",
           "group": "inline@1"
         },
         {
-          "command": "globalProjects.removeProjectScript",
-          "when": "view == globalProjectsView && viewItem == script && globalProjects.editMode",
+          "command": "shelfy.editProjectScript",
+          "when": "view == shelfyView && viewItem == script && shelfy.editMode",
           "group": "inline"
         },
         {
-          "command": "globalProjects.removeItem",
-          "when": "view == globalProjectsView && (viewItem == group || viewItem == project) && globalProjects.editMode",
+          "command": "shelfy.removeProjectScript",
+          "when": "view == shelfyView && viewItem == script && shelfy.editMode",
+          "group": "inline"
+        },
+        {
+          "command": "shelfy.removeItem",
+          "when": "view == shelfyView && (viewItem == group || viewItem == project) && shelfy.editMode",
           "group": "inline"
         }
       ]

@@ -40,13 +40,16 @@ exports.findProjectByPath = findProjectByPath;
 exports.findCommonBasePath = findCommonBasePath;
 const crypto = __importStar(require("crypto"));
 const path = __importStar(require("path"));
-const STORAGE_KEY = "globalProjects.data.v2";
+const projectScriptState_1 = require("./projectScriptState");
+const STORAGE_KEY = "shelfy.data.v2";
+const LEGACY_STORAGE_KEY = "globalProjects.data.v2";
 class ProjectStore {
     constructor(context) {
         this.context = context;
     }
     read() {
-        return (this.context.globalState.get(STORAGE_KEY) ?? {
+        return (this.context.globalState.get(STORAGE_KEY) ??
+            this.context.globalState.get(LEGACY_STORAGE_KEY) ?? {
             version: 2,
             children: []
         });
@@ -138,29 +141,19 @@ class ProjectStore {
         if (!project) {
             throw new Error("Project not found.");
         }
-        const projectScripts = project.scripts ?? (project.scripts = []);
-        const added = [];
-        for (const script of scripts) {
-            if (hasMatchingProjectScript(projectScripts, script)) {
-                continue;
-            }
-            const nextScript = script.kind === "package"
-                ? {
-                    kind: "package",
-                    id: crypto.randomUUID(),
-                    scriptName: script.scriptName
-                }
-                : {
-                    kind: "custom",
-                    id: crypto.randomUUID(),
-                    name: script.name,
-                    command: script.command
-                };
-            projectScripts.push(nextScript);
-            added.push(nextScript);
-        }
+        const added = (0, projectScriptState_1.addProjectScriptsToProject)(project, scripts);
         await this.write(data);
         return added;
+    }
+    async updateProjectScript(projectId, scriptId, nextScript) {
+        const data = this.read();
+        const project = findProjectById(data.children, projectId);
+        if (!project) {
+            throw new Error("Project not found.");
+        }
+        const updated = (0, projectScriptState_1.updateProjectScriptInProject)(project, scriptId, nextScript);
+        await this.write(data);
+        return updated;
     }
     async removeProjectScript(projectId, scriptId) {
         const data = this.read();
@@ -406,14 +399,6 @@ function cloneProjectScript(script) {
             name: script.name,
             command: script.command
         };
-}
-function hasMatchingProjectScript(existingScripts, nextScript) {
-    if (nextScript.kind === "package") {
-        return existingScripts.some((script) => script.kind === "package" && script.scriptName === nextScript.scriptName);
-    }
-    return existingScripts.some((script) => {
-        return script.kind === "custom" && script.command === nextScript.command;
-    });
 }
 function findParentGroupIdForNode(nodes, targetId, currentParentId = undefined) {
     for (const node of nodes) {
