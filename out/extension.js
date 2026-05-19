@@ -79,7 +79,7 @@ async function activate(context) {
         }
         const treeViewOptions = {
             treeDataProvider: provider,
-            showCollapseAll: true
+            showCollapseAll: false
         };
         if ((0, treeBehavior_1.getShelfyTreeMimeTypes)(treeEditable).length > 0) {
             treeViewOptions.dragAndDropController = provider;
@@ -149,7 +149,9 @@ async function activate(context) {
             provider.refresh();
         }
     }));
-    context.subscriptions.push(...registerShelfyCommand("shelfy.refresh", () => provider.refresh()), ...registerShelfyCommand("shelfy.setFilter", async () => {
+    context.subscriptions.push(...registerShelfyCommand("shelfy.refresh", () => provider.refresh()), ...registerShelfyCommand("shelfy.collapseAll", async () => {
+        await vscode.commands.executeCommand("workbench.actions.treeView.shelfyView.collapseAll");
+    }), ...registerShelfyCommand("shelfy.setFilter", async () => {
         const filterText = await vscode.window.showInputBox({
             title: "Filter Shelfy tree",
             prompt: "Filter folders, projects, paths, and scripts",
@@ -290,10 +292,6 @@ async function activate(context) {
         }
     })), ...registerShelfyCommand("shelfy.moveItemToFolder", requireTreeEditable(async (item) => {
         await moveItemToFolder(store, provider, item);
-    })), ...registerShelfyCommand("shelfy.moveItemUp", requireTreeEditable(async (item) => {
-        await moveItemWithinLevel(store, provider, "up", item);
-    })), ...registerShelfyCommand("shelfy.moveItemDown", requireTreeEditable(async (item) => {
-        await moveItemWithinLevel(store, provider, "down", item);
     })), ...registerShelfyCommand("shelfy.openProject", async (item) => {
         await openProjectInCurrentWindow(item);
     }), ...registerShelfyCommand("shelfy.openProjectInNewWindow", async (item) => {
@@ -475,27 +473,6 @@ async function moveItemToFolder(store, provider, item) {
         if (picked.targetGroupId) {
             await provider.markExpanded(picked.targetGroupId);
         }
-        provider.refresh();
-    }
-    catch (error) {
-        await vscode.window.showErrorMessage(asMessage(error));
-    }
-}
-async function moveItemWithinLevel(store, provider, direction, item) {
-    if (!(item instanceof tree_1.GroupItem) && !(item instanceof tree_1.ProjectItem)) {
-        await vscode.window.showInformationMessage(`Use Move ${direction === "up" ? "Up" : "Down"} from a Shelfy project or folder.`);
-        return;
-    }
-    const nodeId = item instanceof tree_1.GroupItem ? item.group.id : item.project.id;
-    const label = item instanceof tree_1.GroupItem ? item.group.name : item.project.name;
-    const adjacentMoveTargets = (0, treeBehavior_1.getAdjacentMoveTargets)(store.read().children, nodeId);
-    const target = direction === "up" ? adjacentMoveTargets.up : adjacentMoveTargets.down;
-    if (!target) {
-        await vscode.window.showInformationMessage(`"${label}" is already the ${direction === "up" ? "first" : "last"} item in its level.`);
-        return;
-    }
-    try {
-        await store.moveNode(nodeId, target.parentGroupId, target.targetIndex);
         provider.refresh();
     }
     catch (error) {

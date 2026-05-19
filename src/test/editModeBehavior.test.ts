@@ -29,7 +29,7 @@ function readManifest(): {
       properties: Record<string, { deprecationMessage?: string }>;
     };
     menus: {
-      "view/title": Array<{ command: string; when?: string; group?: string }>;
+      "view/title": Array<{ command: string; when?: string; group?: string; order?: number }>;
       "view/item/context": Array<{ command: string; when?: string; group?: string }>;
     };
   };
@@ -241,32 +241,16 @@ test("adjacent move targets stay within the current level", () => {
   });
 });
 
-test("manifest shows same-level move actions only for projects and folders in edit mode", () => {
-  const menuItems = readManifest().contributes.menus["view/item/context"];
-  const commandsToCheck = [
-    "shelfy.moveItemUp",
-    "shelfy.moveItemDown",
-    "shelfy.moveItemToFolder"
-  ];
+test("manifest does not contribute move up or move down actions", () => {
+  const manifest = readManifest();
+  const commands = manifest.contributes.commands;
+  const menuItems = manifest.contributes.menus["view/item/context"];
 
-  for (const command of commandsToCheck) {
-    const menuItem = menuItems.find((item) => item.command === command);
-
-    assert.ok(menuItem, `Expected to find menu contribution for ${command}`);
-    assert.match(menuItem.when ?? "", /shelfy\.editMode/);
-    assert.match(menuItem.when ?? "", /viewItem =~ \/\^group/);
-    assert.match(menuItem.when ?? "", /viewItem =~ \/\^project/);
-    assert.doesNotMatch(menuItem.when ?? "", /viewItem == script/);
-  }
-
-  const commands = readManifest().contributes.commands;
-  const moveUpCommand = commands.find((command) => command.command === "shelfy.moveItemUp");
-  const moveDownCommand = commands.find((command) => command.command === "shelfy.moveItemDown");
-
-  assert.ok(moveUpCommand, "Expected to find command contribution for shelfy.moveItemUp");
-  assert.ok(moveDownCommand, "Expected to find command contribution for shelfy.moveItemDown");
-  assert.match(moveUpCommand.enablement ?? "", /canMoveUp/);
-  assert.match(moveDownCommand.enablement ?? "", /canMoveDown/);
+  assert.ok(!commands.some((command) => command.command === "shelfy.moveItemUp"));
+  assert.ok(!commands.some((command) => command.command === "shelfy.moveItemDown"));
+  assert.ok(!menuItems.some((item) => item.command === "shelfy.moveItemUp"));
+  assert.ok(!menuItems.some((item) => item.command === "shelfy.moveItemDown"));
+  assert.ok(menuItems.some((item) => item.command === "shelfy.moveItemToFolder"));
 });
 
 test("manifest contributes personalization actions for projects and folders in edit mode", () => {
@@ -475,6 +459,31 @@ test("manifest contributes filter actions in the view title", () => {
   assert.equal(setFilterMenuItem.group, "navigation@1");
   assert.equal(clearFilterMenuItem.group, "navigation@2");
   assert.equal(sortMenuItem.group, "navigation@3");
+});
+
+test("manifest orders collapse and edit actions in the view title", () => {
+  const manifest = readManifest();
+  const titleMenuItems = manifest.contributes.menus["view/title"];
+
+  const collapseMenuItem = titleMenuItems.find((item) => item.command === "shelfy.collapseAll");
+  const enableEditMenuItem = titleMenuItems.find((item) => item.command === "shelfy.enableEditMode");
+  const disableEditMenuItem = titleMenuItems.find((item) => item.command === "shelfy.disableEditMode");
+  const addFolderMenuItem = titleMenuItems.find((item) => item.command === "shelfy.addRootGroup");
+  const addProjectMenuItem = titleMenuItems.find((item) => item.command === "shelfy.addProject");
+  const refreshMenuItem = titleMenuItems.find((item) => item.command === "shelfy.refresh");
+  const settingsMenuItem = titleMenuItems.find((item) => item.command === "shelfy.openSettings");
+
+  assert.equal(collapseMenuItem?.group, "navigation@4");
+  assert.equal(collapseMenuItem?.order, 0);
+  assert.equal(enableEditMenuItem?.group, "navigation@4");
+  assert.equal(enableEditMenuItem?.order, 1);
+  assert.equal(disableEditMenuItem?.group, "navigation@6");
+  assert.equal(disableEditMenuItem?.order, 1);
+  assert.equal(addFolderMenuItem?.group, "navigation@5");
+  assert.equal(addProjectMenuItem?.group, "navigation@6");
+  assert.equal(addProjectMenuItem?.order, 0);
+  assert.equal(refreshMenuItem?.group, "navigation@7");
+  assert.equal(settingsMenuItem?.group, "navigation@8");
 });
 
 test("manifest contributes a settings action last in the view title", () => {

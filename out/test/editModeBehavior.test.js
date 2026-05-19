@@ -219,28 +219,15 @@ function createStoreContext(initialState) {
         down: undefined
     });
 });
-(0, node_test_1.default)("manifest shows same-level move actions only for projects and folders in edit mode", () => {
-    const menuItems = readManifest().contributes.menus["view/item/context"];
-    const commandsToCheck = [
-        "shelfy.moveItemUp",
-        "shelfy.moveItemDown",
-        "shelfy.moveItemToFolder"
-    ];
-    for (const command of commandsToCheck) {
-        const menuItem = menuItems.find((item) => item.command === command);
-        strict_1.default.ok(menuItem, `Expected to find menu contribution for ${command}`);
-        strict_1.default.match(menuItem.when ?? "", /shelfy\.editMode/);
-        strict_1.default.match(menuItem.when ?? "", /viewItem =~ \/\^group/);
-        strict_1.default.match(menuItem.when ?? "", /viewItem =~ \/\^project/);
-        strict_1.default.doesNotMatch(menuItem.when ?? "", /viewItem == script/);
-    }
-    const commands = readManifest().contributes.commands;
-    const moveUpCommand = commands.find((command) => command.command === "shelfy.moveItemUp");
-    const moveDownCommand = commands.find((command) => command.command === "shelfy.moveItemDown");
-    strict_1.default.ok(moveUpCommand, "Expected to find command contribution for shelfy.moveItemUp");
-    strict_1.default.ok(moveDownCommand, "Expected to find command contribution for shelfy.moveItemDown");
-    strict_1.default.match(moveUpCommand.enablement ?? "", /canMoveUp/);
-    strict_1.default.match(moveDownCommand.enablement ?? "", /canMoveDown/);
+(0, node_test_1.default)("manifest does not contribute move up or move down actions", () => {
+    const manifest = readManifest();
+    const commands = manifest.contributes.commands;
+    const menuItems = manifest.contributes.menus["view/item/context"];
+    strict_1.default.ok(!commands.some((command) => command.command === "shelfy.moveItemUp"));
+    strict_1.default.ok(!commands.some((command) => command.command === "shelfy.moveItemDown"));
+    strict_1.default.ok(!menuItems.some((item) => item.command === "shelfy.moveItemUp"));
+    strict_1.default.ok(!menuItems.some((item) => item.command === "shelfy.moveItemDown"));
+    strict_1.default.ok(menuItems.some((item) => item.command === "shelfy.moveItemToFolder"));
 });
 (0, node_test_1.default)("manifest contributes personalization actions for projects and folders in edit mode", () => {
     const manifest = readManifest();
@@ -403,6 +390,28 @@ function createStoreContext(initialState) {
     strict_1.default.equal(setFilterMenuItem.group, "navigation@1");
     strict_1.default.equal(clearFilterMenuItem.group, "navigation@2");
     strict_1.default.equal(sortMenuItem.group, "navigation@3");
+});
+(0, node_test_1.default)("manifest orders collapse and edit actions in the view title", () => {
+    const manifest = readManifest();
+    const titleMenuItems = manifest.contributes.menus["view/title"];
+    const collapseMenuItem = titleMenuItems.find((item) => item.command === "shelfy.collapseAll");
+    const enableEditMenuItem = titleMenuItems.find((item) => item.command === "shelfy.enableEditMode");
+    const disableEditMenuItem = titleMenuItems.find((item) => item.command === "shelfy.disableEditMode");
+    const addFolderMenuItem = titleMenuItems.find((item) => item.command === "shelfy.addRootGroup");
+    const addProjectMenuItem = titleMenuItems.find((item) => item.command === "shelfy.addProject");
+    const refreshMenuItem = titleMenuItems.find((item) => item.command === "shelfy.refresh");
+    const settingsMenuItem = titleMenuItems.find((item) => item.command === "shelfy.openSettings");
+    strict_1.default.equal(collapseMenuItem?.group, "navigation@4");
+    strict_1.default.equal(collapseMenuItem?.order, 0);
+    strict_1.default.equal(enableEditMenuItem?.group, "navigation@4");
+    strict_1.default.equal(enableEditMenuItem?.order, 1);
+    strict_1.default.equal(disableEditMenuItem?.group, "navigation@6");
+    strict_1.default.equal(disableEditMenuItem?.order, 1);
+    strict_1.default.equal(addFolderMenuItem?.group, "navigation@5");
+    strict_1.default.equal(addProjectMenuItem?.group, "navigation@6");
+    strict_1.default.equal(addProjectMenuItem?.order, 0);
+    strict_1.default.equal(refreshMenuItem?.group, "navigation@7");
+    strict_1.default.equal(settingsMenuItem?.group, "navigation@8");
 });
 (0, node_test_1.default)("manifest contributes a settings action last in the view title", () => {
     const manifest = readManifest();
