@@ -36,6 +36,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.ShelfyProvider = exports.ScriptItem = exports.ProjectItem = exports.GroupItem = void 0;
 const vscode = __importStar(require("vscode"));
 const config_1 = require("./config");
+const personalization_1 = require("./personalization");
 const projectColor_1 = require("./projectColor");
 const treeBehavior_1 = require("./treeBehavior");
 const treeFilter_1 = require("./treeFilter");
@@ -49,18 +50,18 @@ const LEGACY_SORT_MODE_KEY = "globalProjects.sortMode";
 const FILTER_TEXT_KEY = "shelfy.filterText";
 const LEGACY_FILTER_TEXT_KEY = "globalProjects.filterText";
 class GroupItem extends vscode.TreeItem {
-    constructor(group) {
+    constructor(group, iconPath, contextValue = "group") {
         super(group.name, vscode.TreeItemCollapsibleState.Collapsed);
         this.group = group;
         this.id = group.id;
-        this.contextValue = "group";
-        this.tooltip = group.name;
-        this.iconPath = new vscode.ThemeIcon("folder-library");
+        this.contextValue = contextValue;
+        this.tooltip = buildGroupTooltip(group);
+        this.iconPath = iconPath;
     }
 }
 exports.GroupItem = GroupItem;
 class ProjectItem extends vscode.TreeItem {
-    constructor(project, iconPath, projectColor, showPath = true, editMode = false, expandScripts = editMode) {
+    constructor(project, iconPath, projectColor, projectIcon, showPath = true, editMode = false, expandScripts = editMode, contextValue = "project") {
         const scriptCount = project.scripts?.length ?? 0;
         super(project.name, scriptCount > 0
             ? expandScripts
@@ -69,10 +70,12 @@ class ProjectItem extends vscode.TreeItem {
             : vscode.TreeItemCollapsibleState.None);
         this.project = project;
         this.id = project.id;
-        this.contextValue = "project";
+        this.contextValue = contextValue;
         this.description = showPath ? project.projectPath : undefined;
         const scriptSummary = scriptCount > 0 ? `\nScripts: ${scriptCount}` : "";
-        this.tooltip = `${project.projectPath}${projectColor ? `\nColor: ${projectColor}` : ""}${scriptSummary}`;
+        const colorSummary = projectColor ? `\nColor: ${projectColor}` : "";
+        const iconSummary = projectIcon ? `\nIcon: ${projectIcon}` : "";
+        this.tooltip = `${project.projectPath}${colorSummary}${iconSummary}${scriptSummary}`;
         const command = (0, treeBehavior_1.getProjectRowCommandDefinition)(editMode);
         if (command) {
             this.command = {
@@ -166,6 +169,9 @@ class ShelfyProvider {
         await this.context.workspaceState.update(FILTER_TEXT_KEY, normalized);
         this.emitter.fire();
     }
+    async getProjectConfigurationColor(projectPath) {
+        return this.ensureColor(projectPath);
+    }
     getTreeItem(element) {
         return element;
     }
@@ -199,21 +205,22 @@ class ShelfyProvider {
         const items = [];
         const nodesToRender = this.sortNodes(nodes);
         const expandForFilter = this.hasFilter();
+        const rootNodes = this.store.read().children;
         for (const node of nodesToRender) {
+            const adjacentMoveTargets = (0, treeBehavior_1.getAdjacentMoveTargets)(rootNodes, node.id);
             if (node.kind === "group") {
-                const item = new GroupItem(node);
+                const iconPath = await this.resolveGroupIconPath(node);
+                const item = new GroupItem(node, iconPath, getMoveContextValue("group", adjacentMoveTargets, (0, personalization_1.hasNodePersonalization)(node.personalization)));
                 item.collapsibleState = expandForFilter || this.expandedGroupIds.has(node.id)
                     ? vscode.TreeItemCollapsibleState.Expanded
                     : vscode.TreeItemCollapsibleState.Collapsed;
                 items.push(item);
             }
             else {
-                const color = await this.ensureColor(node.projectPath);
-                const iconPath = color
-                    ? await getOrCreateColorIcon(this.context, color)
-                    : new vscode.ThemeIcon("folder");
+                const color = await this.resolveProjectDisplayColor(node);
+                const iconPath = await this.resolveProjectIconPath(node, color);
                 const showPath = (0, config_1.getShelfySetting)("showProjectPath", false);
-                items.push(new ProjectItem(node, iconPath, color, showPath, this.editMode, this.editMode || expandForFilter));
+                items.push(new ProjectItem(node, iconPath, color, (0, personalization_1.formatPersonalizationIcon)(node.personalization?.icon), showPath, this.editMode, this.editMode || expandForFilter, getMoveContextValue("project", adjacentMoveTargets, (0, personalization_1.hasNodePersonalization)(node.personalization))));
             }
         }
         return items;
@@ -305,6 +312,25 @@ class ShelfyProvider {
         this.colorCache.set(projectPath, color);
         this.emitter.fire();
     }
+    async resolveProjectDisplayColor(project) {
+        return project.personalization?.color ?? this.ensureColor(project.projectPath);
+    }
+    async resolveProjectIconPath(project, color) {
+        const personalizedIcon = await getOrCreatePersonalizedIcon(this.context, project.personalization, color);
+        if (personalizedIcon) {
+            return personalizedIcon;
+        }
+        return color ? getOrCreateColorIcon(this.context, color) : new vscode.ThemeIcon("folder");
+    }
+    async resolveGroupIconPath(group) {
+        const personalizedIcon = await getOrCreatePersonalizedIcon(this.context, group.personalization, group.personalization?.color);
+        if (personalizedIcon) {
+            return personalizedIcon;
+        }
+        return group.personalization?.color
+            ? getOrCreateColorIcon(this.context, group.personalization.color)
+            : new vscode.ThemeIcon("folder-library");
+    }
     async syncWatchers() {
         const projects = collectProjects(this.store.read().children);
         const activePaths = new Set(projects.map((p) => p.projectPath));
@@ -368,6 +394,25 @@ class ShelfyProvider {
     }
 }
 exports.ShelfyProvider = ShelfyProvider;
+function getMoveContextValue(kind, adjacentMoveTargets, hasPersonalization = false) {
+    const contextValues = [kind];
+    if (adjacentMoveTargets.up) {
+        contextValues.push("canMoveUp");
+    }
+    if (adjacentMoveTargets.down) {
+        contextValues.push("canMoveDown");
+    }
+    if (hasPersonalization) {
+        contextValues.push("hasPersonalization");
+    }
+    return contextValues.join(":");
+}
+function buildGroupTooltip(group) {
+    const colorSummary = group.personalization?.color ? `\nColor: ${group.personalization.color}` : "";
+    const iconLabel = (0, personalization_1.formatPersonalizationIcon)(group.personalization?.icon);
+    const iconSummary = iconLabel ? `\nIcon: ${iconLabel}` : "";
+    return `${group.name}${colorSummary}${iconSummary}`;
+}
 function collectProjects(nodes) {
     const result = [];
     for (const node of nodes) {
@@ -393,6 +438,39 @@ async function getOrCreateColorIcon(context, color) {
         const svg = `
 <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16">
   <rect x="2" y="2" width="12" height="12" rx="3" ry="3" fill="${normalized}" stroke="#888888" stroke-width="1"/>
+</svg>`.trim();
+        await fs.writeFile(iconFile, svg, "utf8");
+    }
+    return vscode.Uri.file(iconFile);
+}
+async function getOrCreatePersonalizedIcon(context, personalization, fallbackColor) {
+    if (!personalization?.icon) {
+        return undefined;
+    }
+    const icon = (0, personalization_1.getFontAwesomeIcon)(personalization.icon);
+    if (!icon) {
+        return undefined;
+    }
+    const fill = (personalization.color ?? fallbackColor ?? "#888888").toLowerCase();
+    const hash = crypto
+        .createHash("sha1")
+        .update(`${icon.iconName}:${fill}`)
+        .digest("hex")
+        .slice(0, 12);
+    const iconDir = path.join(context.globalStorageUri.fsPath, "icons");
+    const iconFile = path.join(iconDir, `fa-${hash}.svg`);
+    await fs.mkdir(iconDir, { recursive: true });
+    try {
+        await fs.access(iconFile);
+    }
+    catch {
+        const [width, height, , , svgPathData] = icon.icon;
+        const paths = (Array.isArray(svgPathData) ? svgPathData : [svgPathData])
+            .map((pathData) => `<path d="${pathData}" fill="${fill}"/>`)
+            .join("");
+        const svg = `
+<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 ${width} ${height}">
+  ${paths}
 </svg>`.trim();
         await fs.writeFile(iconFile, svg, "utf8");
     }

@@ -1,10 +1,15 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.SHELFY_TREE_MIME = void 0;
+exports.isShelfyTreeEditable = isShelfyTreeEditable;
 exports.getShelfyTreeMimeTypes = getShelfyTreeMimeTypes;
 exports.getProjectRowCommandDefinition = getProjectRowCommandDefinition;
 exports.getMoveDestinations = getMoveDestinations;
+exports.getAdjacentMoveTargets = getAdjacentMoveTargets;
 exports.SHELFY_TREE_MIME = "application/vnd.code.tree.shelfyView";
+function isShelfyTreeEditable(editMode, hasFilter) {
+    return editMode && !hasFilter;
+}
 function getShelfyTreeMimeTypes(editMode) {
     // VS Code snapshots tree drag/drop MIME types when the controller is
     // registered, so edit-mode toggles recreate the tree view.
@@ -35,6 +40,29 @@ function getMoveDestinations(nodes, sourceNodeId) {
     }
     collectGroupDestinations(nodes, source, [], destinations);
     return destinations;
+}
+function getAdjacentMoveTargets(nodes, sourceNodeId) {
+    const source = findNodeInfo(nodes, sourceNodeId);
+    if (!source) {
+        return {
+            up: undefined,
+            down: undefined
+        };
+    }
+    return {
+        up: source.index > 0
+            ? {
+                parentGroupId: source.parentGroupId,
+                targetIndex: source.index - 1
+            }
+            : undefined,
+        down: source.index < source.siblingCount - 1
+            ? {
+                parentGroupId: source.parentGroupId,
+                targetIndex: source.index + 1
+            }
+            : undefined
+    };
 }
 function collectGroupDestinations(nodes, source, parentNames, destinations) {
     for (const node of nodes) {
@@ -68,11 +96,14 @@ function containsGroupId(group, groupId) {
     return group.children.some((child) => child.kind === "group" && containsGroupId(child, groupId));
 }
 function findNodeInfo(nodes, sourceNodeId, parentGroupId = undefined) {
-    for (const node of nodes) {
+    for (let index = 0; index < nodes.length; index += 1) {
+        const node = nodes[index];
         if (node.id === sourceNodeId) {
             return {
                 node,
-                parentGroupId
+                parentGroupId,
+                index,
+                siblingCount: nodes.length
             };
         }
         if (node.kind === "group") {

@@ -46,7 +46,7 @@ export async function readProjectColor(projectPath: string): Promise<string | un
   }
 }
 
-function isColorValue(value: string): boolean {
+export function isColorValue(value: string): boolean {
   return (
     /^#([0-9a-fA-F]{3}|[0-9a-fA-F]{4}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/.test(value) ||
     /^rgb(a)?\(/i.test(value) ||
