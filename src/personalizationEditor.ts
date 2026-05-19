@@ -1,4 +1,6 @@
 import * as vscode from "vscode";
+import * as fs from "fs/promises";
+import * as path from "path";
 import type { NodePersonalization } from "./model";
 import { getFontAwesomeIcon, getFontAwesomeQuickPickIcons } from "./personalization";
 import { isColorValue } from "./projectColor";
@@ -87,6 +89,8 @@ const webviewIconOptions: readonly WebviewIconOption[] = getFontAwesomeQuickPick
   })
   .filter((option): option is WebviewIconOption => option !== undefined);
 
+let editorTemplatePromise: Promise<string> | undefined;
+
 export async function showPersonalizationEditor(
   options: PersonalizationEditorOptions
 ): Promise<PersonalizationEditorResult | undefined> {
@@ -101,7 +105,7 @@ export async function showPersonalizationEditor(
   );
 
   const nonce = createNonce();
-  panel.webview.html = getEditorHtml(panel.webview, nonce, options);
+  panel.webview.html = await getEditorHtml(panel.webview, nonce, options);
 
   let sentIconCatalog = false;
 
@@ -206,11 +210,48 @@ function parseEditorResult(
   };
 }
 
-function getEditorHtml(
+async function getEditorHtml(
   webview: vscode.Webview,
   nonce: string,
   options: PersonalizationEditorOptions
-): string {
+): Promise<string> {
+  const initialState = {
+    label: options.label,
+    kind: options.kind,
+    color: options.personalization?.color ?? "",
+    icon: options.personalization?.icon ?? null,
+    iconSvgMarkup:
+      options.personalization?.icon !== undefined
+        ? buildFontAwesomeSvgMarkup(options.personalization.icon)
+        : null,
+    projectConfigColor: options.projectConfigColor ?? null
+  };
+
+  const previewAssets = {
+    defaultSvg: options.kind === "group" ? DEFAULT_GROUP_SVG : DEFAULT_PROJECT_SVG,
+    swatchSvg: COLOR_SWATCH_SVG,
+    fallbackColor: PREVIEW_FALLBACK_COLOR,
+    totalIconCount: webviewIconOptions.length,
+    defaultLabel: options.kind === "group" ? "Default folder icon" : "Default project icon",
+    itemKindLabel: options.kind === "group" ? "Folder" : "Project"
+  };
+
+  const template = await loadEditorTemplate();
+
+  return template
+    .replace(/{{CSP_SOURCE}}/g, webview.cspSource)
+    .replace(/{{NONCE}}/g, nonce)
+    .replace(/{{PREVIEW_FALLBACK_COLOR}}/g, PREVIEW_FALLBACK_COLOR)
+    .replace(/{{LABEL_HTML}}/g, escapeHtml(options.label))
+    .replace(/{{PROJECT_HINT}}/g, options.kind === "project" && options.projectConfigColor
+      ? ` Clearing the override falls back to ${escapeHtml(options.projectConfigColor)} when available.`
+      : "")
+    .replace(/{{INITIAL_STATE_JSON}}/g, JSON.stringify(initialState))
+    .replace(/{{PREVIEW_ASSETS_JSON}}/g, JSON.stringify(previewAssets));
+
+}
+
+  /*
   const initialState = {
     label: options.label,
     kind: options.kind,
@@ -265,9 +306,8 @@ function getEditorHtml(
       padding: 18px;
     }
 
-    .panel {
-      display: grid;
-      gap: 16px;
+    .preview-glyph,
+    .icon-button__glyph {
       padding: 18px;
       border-radius: 18px;
       border: 1px solid var(--vscode-panel-border, rgba(127, 127, 127, 0.35));
@@ -278,34 +318,18 @@ function getEditorHtml(
     .header {
       display: flex;
       justify-content: space-between;
-      gap: 16px;
-      align-items: flex-start;
-      flex-wrap: wrap;
+    .preview-glyph svg,
+    .icon-button__glyph svg {
     }
 
     .summary {
       display: flex;
-      gap: 14px;
-      align-items: center;
-      min-width: 0;
-    }
-
-    .preview-frame {
-      flex: 0 0 72px;
-      width: 72px;
-      height: 72px;
-      border-radius: 18px;
-      display: grid;
-      place-items: center;
-      background:
-        linear-gradient(145deg, rgba(255, 255, 255, 0.06), rgba(0, 0, 0, 0.14)),
         var(--vscode-input-background);
       border: 1px solid color-mix(in srgb, var(--vscode-focusBorder) 24%, transparent);
       color: var(--effective-icon-color);
     }
 
     .preview-glyph,
-    .selected-icon,
     .icon-button__glyph {
       display: grid;
       place-items: center;
@@ -318,7 +342,6 @@ function getEditorHtml(
     }
 
     .preview-glyph svg,
-    .selected-icon svg,
     .icon-button__glyph svg {
       width: 100%;
       height: 100%;
@@ -458,20 +481,6 @@ function getEditorHtml(
     input[type="color"]:focus-visible {
       outline: 2px solid var(--vscode-focusBorder);
       outline-offset: 2px;
-    }
-
-    .selected-icon {
-      width: 30px;
-      height: 30px;
-      flex: 0 0 30px;
-      border-radius: 9px;
-      background: color-mix(in srgb, var(--vscode-editor-background) 60%, transparent);
-      border: 1px solid var(--vscode-panel-border, rgba(127, 127, 127, 0.35));
-    }
-
-    .selected-icon svg {
-      width: 18px;
-      height: 18px;
     }
 
     .icon-action {
@@ -686,7 +695,6 @@ function getEditorHtml(
         </div>
         <div class="control-row">
           <div class="search-shell">
-            <span class="selected-icon" id="selectedIconGlyph"></span>
             <input id="iconSearch" type="search" placeholder="Search Font Awesome icons">
           </div>
           <button id="clearIcon" class="icon-action" type="button" title="Clear icon override" aria-label="Clear icon override">${CLEAR_BUTTON_SVG}</button>
@@ -718,7 +726,6 @@ function getEditorHtml(
     const colorText = document.getElementById('colorText');
     const clearColor = document.getElementById('clearColor');
     const iconSearch = document.getElementById('iconSearch');
-    const selectedIconGlyph = document.getElementById('selectedIconGlyph');
     const clearIcon = document.getElementById('clearIcon');
     const iconGrid = document.getElementById('iconGrid');
     const emptyState = document.getElementById('emptyState');
@@ -828,7 +835,6 @@ function getEditorHtml(
     function renderAll() {
       updateEffectiveColor();
       renderPreview();
-      renderSelectedIconPreview();
       clearColor.disabled = colorText.value.trim().length === 0;
       updateIconSelection();
       applyIconFilter();
@@ -861,10 +867,6 @@ function getEditorHtml(
       previewMode.textContent = preview.mode;
       previewColor.textContent = preview.colorLabel;
       previewIcon.textContent = preview.iconLabel;
-    }
-
-    function renderSelectedIconPreview() {
-      selectedIconGlyph.innerHTML = state.icon ? getIconMarkup(state.icon) : previewAssets.defaultSvg;
     }
 
     function updateEffectiveColor() {
@@ -1059,7 +1061,17 @@ function getEditorHtml(
     }
   </script>
 </body>
-</html>`;
+}</html>`;
+}
+*/
+
+async function loadEditorTemplate(): Promise<string> {
+  if (!editorTemplatePromise) {
+    const templatePath = path.join(__dirname, "..", "media", "personalizationEditor.html");
+    editorTemplatePromise = fs.readFile(templatePath, "utf8");
+  }
+
+  return await editorTemplatePromise;
 }
 
 function createNonce(): string {
