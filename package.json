@@ -2,7 +2,7 @@
   "name": "shelfy",
   "displayName": "Shelfy",
   "description": "Save project directories globally and organize them in virtual folders.",
-  "version": "0.0.47",
+  "version": "0.0.54",
   "publisher": "TheBabonz",
   "repository": {
     "type": "git",
@@ -77,6 +77,19 @@
         }
       },
       {
+        "command": "shelfy.editItemPersonalization",
+        "title": "Edit Personalization",
+        "icon": {
+          "light": "media/light/edit.svg",
+          "dark": "media/dark/edit.svg"
+        }
+      },
+      {
+        "command": "shelfy.revertItemPersonalization",
+        "title": "Revert Personalization",
+        "icon": "$(discard)"
+      },
+      {
         "command": "shelfy.addProjectScript",
         "title": "Add Script",
         "icon": {
@@ -122,6 +135,18 @@
         "icon": "$(move)"
       },
       {
+        "command": "shelfy.moveItemUp",
+        "title": "Move Up",
+        "icon": "$(arrow-up)",
+        "enablement": "shelfy.editMode && viewItem =~ /(^|:)canMoveUp(:|$)/"
+      },
+      {
+        "command": "shelfy.moveItemDown",
+        "title": "Move Down",
+        "icon": "$(arrow-down)",
+        "enablement": "shelfy.editMode && viewItem =~ /(^|:)canMoveDown(:|$)/"
+      },
+      {
         "command": "shelfy.openProject",
         "title": "Open Project",
         "icon": {
@@ -158,6 +183,11 @@
         }
       },
       {
+        "command": "shelfy.openSettings",
+        "title": "Shelfy Settings",
+        "icon": "$(settings-gear)"
+      },
+      {
         "command": "shelfy.setFilter",
         "title": "Filter Projects",
         "icon": "$(search)"
@@ -165,7 +195,10 @@
       {
         "command": "shelfy.clearFilter",
         "title": "Clear Filter",
-        "icon": "$(close)"
+        "icon": {
+          "light": "media/light/clear-filter.svg",
+          "dark": "media/dark/clear-filter.svg"
+        }
       },
       {
         "command": "shelfy.exportConfiguration",
@@ -218,106 +251,131 @@
     "menus": {
       "view/title": [
         {
-          "command": "shelfy.enableEditMode",
-          "when": "view == shelfyView && !shelfy.editMode",
-          "group": "navigation@1"
-        },
-        {
-          "command": "shelfy.disableEditMode",
-          "when": "view == shelfyView && shelfy.editMode",
-          "group": "navigation@1"
-        },
-        {
-          "command": "shelfy.addRootGroup",
-          "when": "view == shelfyView && shelfy.editMode",
-          "group": "navigation@2"
-        },
-        {
-          "command": "shelfy.addProject",
-          "when": "view == shelfyView && shelfy.editMode",
-          "group": "navigation@3"
-        },
-        {
-          "command": "shelfy.refresh",
-          "when": "view == shelfyView",
-          "group": "navigation@4"
-        },
-        {
           "command": "shelfy.setFilter",
           "when": "view == shelfyView",
-          "group": "navigation@5"
+          "group": "navigation@1"
         },
         {
           "command": "shelfy.clearFilter",
           "when": "view == shelfyView && shelfy.hasFilter",
-          "group": "navigation@6"
+          "group": "navigation@2"
         },
         {
           "command": "shelfy.cycleSortFromNone",
           "when": "view == shelfyView && shelfy.sortMode == none",
-          "group": "navigation@7"
+          "group": "navigation@3"
         },
         {
           "command": "shelfy.cycleSortFromAsc",
           "when": "view == shelfyView && shelfy.sortMode == asc",
-          "group": "navigation@7"
+          "group": "navigation@3"
         },
         {
           "command": "shelfy.cycleSortFromDesc",
           "when": "view == shelfyView && shelfy.sortMode == desc",
+          "group": "navigation@3"
+        },
+        {
+          "command": "shelfy.enableEditMode",
+          "when": "view == shelfyView && !shelfy.editMode && !shelfy.hasFilter",
+          "group": "navigation@4"
+        },
+        {
+          "command": "shelfy.disableEditMode",
+          "when": "view == shelfyView && shelfy.editMode",
+          "group": "navigation@4"
+        },
+        {
+          "command": "shelfy.addRootGroup",
+          "when": "view == shelfyView && shelfy.editMode",
+          "group": "navigation@5"
+        },
+        {
+          "command": "shelfy.addProject",
+          "when": "view == shelfyView && shelfy.editMode",
+          "group": "navigation@6"
+        },
+        {
+          "command": "shelfy.refresh",
+          "when": "view == shelfyView",
           "group": "navigation@7"
+        },
+        {
+          "command": "shelfy.openSettings",
+          "when": "view == shelfyView",
+          "group": "navigation@8"
         }
       ],
       "view/item/context": [
         {
           "command": "shelfy.openProject",
-          "when": "view == shelfyView && viewItem == project && !shelfy.editMode && (shelfy.clickAction == noAction || shelfy.clickAction == openNewInstance)",
+          "when": "view == shelfyView && viewItem =~ /^project(?:$|:)/ && !shelfy.editMode && (shelfy.clickAction == noAction || shelfy.clickAction == openNewInstance)",
           "group": "inline@1"
         },
         {
           "command": "shelfy.openProjectInNewWindow",
-          "when": "view == shelfyView && viewItem == project && !shelfy.editMode && (shelfy.clickAction == noAction || shelfy.clickAction == openSameInstance)",
+          "when": "view == shelfyView && viewItem =~ /^project(?:$|:)/ && !shelfy.editMode && (shelfy.clickAction == noAction || shelfy.clickAction == openSameInstance)",
           "group": "inline@2"
         },
         {
           "command": "shelfy.openInExplorer",
-          "when": "view == shelfyView && viewItem == project && !shelfy.editMode",
+          "when": "view == shelfyView && viewItem =~ /^project(?:$|:)/ && !shelfy.editMode",
           "group": "inline@3"
         },
         {
           "command": "shelfy.addProject",
-          "when": "view == shelfyView && viewItem == group && shelfy.editMode",
+          "when": "view == shelfyView && viewItem =~ /^group(?:$|:)/ && shelfy.editMode",
           "group": "inline"
         },
         {
           "command": "shelfy.addSubgroup",
-          "when": "view == shelfyView && viewItem == group && shelfy.editMode",
+          "when": "view == shelfyView && viewItem =~ /^group(?:$|:)/ && shelfy.editMode",
           "group": "inline"
         },
         {
           "command": "shelfy.renameGroup",
-          "when": "view == shelfyView && viewItem == group && shelfy.editMode",
+          "when": "view == shelfyView && viewItem =~ /^group(?:$|:)/ && shelfy.editMode",
+          "group": "inline"
+        },
+        {
+          "command": "shelfy.editItemPersonalization",
+          "when": "view == shelfyView && (viewItem =~ /^group(?:$|:)/ || viewItem =~ /^project(?:$|:)/) && shelfy.editMode",
+          "group": "inline"
+        },
+        {
+          "command": "shelfy.revertItemPersonalization",
+          "when": "view == shelfyView && (viewItem =~ /^group(?:$|:)/ || viewItem =~ /^project(?:$|:)/) && viewItem =~ /(^|:)hasPersonalization(:|$)/ && shelfy.editMode",
           "group": "inline"
         },
         {
           "command": "shelfy.renameProject",
-          "when": "view == shelfyView && viewItem == project && shelfy.editMode",
+          "when": "view == shelfyView && viewItem =~ /^project(?:$|:)/ && shelfy.editMode",
           "group": "inline"
         },
         {
           "command": "shelfy.addProjectScript",
-          "when": "view == shelfyView && viewItem == project && shelfy.editMode",
+          "when": "view == shelfyView && viewItem =~ /^project(?:$|:)/ && shelfy.editMode",
           "group": "inline"
         },
         {
           "command": "shelfy.cloneGroupWithNewBase",
-          "when": "view == shelfyView && viewItem == group && shelfy.editMode",
+          "when": "view == shelfyView && viewItem =~ /^group(?:$|:)/ && shelfy.editMode",
           "group": "inline"
         },
         {
-          "command": "shelfy.moveItemToFolder",
-          "when": "view == shelfyView && (viewItem == group || viewItem == project) && shelfy.editMode",
+          "command": "shelfy.moveItemUp",
+          "when": "view == shelfyView && (viewItem =~ /^group(?:$|:)/ || viewItem =~ /^project(?:$|:)/) && shelfy.editMode",
           "group": "2_modification@1"
+        },
+        {
+          "command": "shelfy.moveItemDown",
+          "when": "view == shelfyView && (viewItem =~ /^group(?:$|:)/ || viewItem =~ /^project(?:$|:)/) && shelfy.editMode",
+          "group": "2_modification@2"
+        },
+        {
+          "command": "shelfy.moveItemToFolder",
+          "when": "view == shelfyView && (viewItem =~ /^group(?:$|:)/ || viewItem =~ /^project(?:$|:)/) && shelfy.editMode",
+          "group": "2_modification@3"
         },
         {
           "command": "shelfy.runProjectScript",
@@ -336,7 +394,7 @@
         },
         {
           "command": "shelfy.removeItem",
-          "when": "view == shelfyView && (viewItem == group || viewItem == project) && shelfy.editMode",
+          "when": "view == shelfyView && (viewItem =~ /^group(?:$|:)/ || viewItem =~ /^project(?:$|:)/) && shelfy.editMode",
           "group": "inline"
         }
       ]
@@ -391,6 +449,8 @@
     "typescript": "^5.5.4"
   },
   "dependencies": {
+    "@fortawesome/fontawesome-svg-core": "^6.7.2",
+    "@fortawesome/free-solid-svg-icons": "^6.7.2",
     "jsonc-parser": "^3.3.1"
   }
 }

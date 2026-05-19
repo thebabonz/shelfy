@@ -41,8 +41,11 @@ const fs = __importStar(require("node:fs"));
 const path = __importStar(require("node:path"));
 const node_test_1 = __importDefault(require("node:test"));
 const projectScriptState_1 = require("../projectScriptState");
+const store_1 = require("../store");
 const treeFilter_1 = require("../treeFilter");
 const treeBehavior_1 = require("../treeBehavior");
+const STORAGE_KEY = "shelfy.data.v2";
+const LEGACY_STORAGE_KEY = "globalProjects.data.v2";
 function readManifest() {
     const manifestPath = path.resolve(__dirname, "..", "..", "package.json");
     return JSON.parse(fs.readFileSync(manifestPath, "utf8"));
@@ -110,6 +113,30 @@ function createProjectWithScripts() {
         ]
     };
 }
+function createStoreContext(initialState) {
+    const state = new Map();
+    for (const [key, value] of Object.entries(initialState)) {
+        if (value !== undefined) {
+            state.set(key, value);
+        }
+    }
+    return {
+        globalState: {
+            get(key) {
+                return state.get(key);
+            },
+            update(key, value) {
+                if (value === undefined) {
+                    state.delete(key);
+                }
+                else {
+                    state.set(key, value);
+                }
+                return Promise.resolve();
+            }
+        }
+    };
+}
 (0, node_test_1.default)("drag and drop mime types are disabled outside edit mode", () => {
     strict_1.default.deepEqual((0, treeBehavior_1.getShelfyTreeMimeTypes)(false), []);
 });
@@ -119,6 +146,15 @@ function createProjectWithScripts() {
 (0, node_test_1.default)("project rows do not expose an open command in edit mode", () => {
     strict_1.default.equal((0, treeBehavior_1.getProjectRowCommandDefinition)(true), undefined);
     strict_1.default.deepEqual((0, treeBehavior_1.getProjectRowCommandDefinition)(false), {
+        command: "shelfy.openProjectFromRow",
+        title: "Open Project"
+    });
+});
+(0, node_test_1.default)("filter mode disables tree editing affordances", () => {
+    strict_1.default.equal((0, treeBehavior_1.isShelfyTreeEditable)(true, false), true);
+    strict_1.default.equal((0, treeBehavior_1.isShelfyTreeEditable)(true, true), false);
+    strict_1.default.deepEqual((0, treeBehavior_1.getShelfyTreeMimeTypes)((0, treeBehavior_1.isShelfyTreeEditable)(true, true)), []);
+    strict_1.default.deepEqual((0, treeBehavior_1.getProjectRowCommandDefinition)((0, treeBehavior_1.isShelfyTreeEditable)(true, true)), {
         command: "shelfy.openProjectFromRow",
         title: "Open Project"
     });
@@ -156,14 +192,128 @@ function createProjectWithScripts() {
     strict_1.default.equal(rootProjectDestinations.some((destination) => destination.targetGroupId === undefined), false);
     strict_1.default.equal(nestedProjectDestinations.some((destination) => destination.targetGroupId === "frontend"), false);
 });
-(0, node_test_1.default)("manifest shows move action only for projects and folders in edit mode", () => {
+(0, node_test_1.default)("adjacent move targets stay within the current level", () => {
+    strict_1.default.deepEqual((0, treeBehavior_1.getAdjacentMoveTargets)(createTree(), "frontend"), {
+        up: undefined,
+        down: {
+            parentGroupId: undefined,
+            targetIndex: 1
+        }
+    });
+    strict_1.default.deepEqual((0, treeBehavior_1.getAdjacentMoveTargets)(createTree(), "web-app"), {
+        up: undefined,
+        down: {
+            parentGroupId: "frontend",
+            targetIndex: 1
+        }
+    });
+    strict_1.default.deepEqual((0, treeBehavior_1.getAdjacentMoveTargets)(createTree(), "components"), {
+        up: {
+            parentGroupId: "frontend",
+            targetIndex: 0
+        },
+        down: undefined
+    });
+    strict_1.default.deepEqual((0, treeBehavior_1.getAdjacentMoveTargets)(createTree(), "buttons"), {
+        up: undefined,
+        down: undefined
+    });
+});
+(0, node_test_1.default)("manifest shows same-level move actions only for projects and folders in edit mode", () => {
     const menuItems = readManifest().contributes.menus["view/item/context"];
-    const menuItem = menuItems.find((item) => item.command === "shelfy.moveItemToFolder");
-    strict_1.default.ok(menuItem, "Expected to find menu contribution for shelfy.moveItemToFolder");
-    strict_1.default.match(menuItem.when ?? "", /shelfy\.editMode/);
-    strict_1.default.match(menuItem.when ?? "", /viewItem == group/);
-    strict_1.default.match(menuItem.when ?? "", /viewItem == project/);
-    strict_1.default.doesNotMatch(menuItem.when ?? "", /viewItem == script/);
+    const commandsToCheck = [
+        "shelfy.moveItemUp",
+        "shelfy.moveItemDown",
+        "shelfy.moveItemToFolder"
+    ];
+    for (const command of commandsToCheck) {
+        const menuItem = menuItems.find((item) => item.command === command);
+        strict_1.default.ok(menuItem, `Expected to find menu contribution for ${command}`);
+        strict_1.default.match(menuItem.when ?? "", /shelfy\.editMode/);
+        strict_1.default.match(menuItem.when ?? "", /viewItem =~ \/\^group/);
+        strict_1.default.match(menuItem.when ?? "", /viewItem =~ \/\^project/);
+        strict_1.default.doesNotMatch(menuItem.when ?? "", /viewItem == script/);
+    }
+    const commands = readManifest().contributes.commands;
+    const moveUpCommand = commands.find((command) => command.command === "shelfy.moveItemUp");
+    const moveDownCommand = commands.find((command) => command.command === "shelfy.moveItemDown");
+    strict_1.default.ok(moveUpCommand, "Expected to find command contribution for shelfy.moveItemUp");
+    strict_1.default.ok(moveDownCommand, "Expected to find command contribution for shelfy.moveItemDown");
+    strict_1.default.match(moveUpCommand.enablement ?? "", /canMoveUp/);
+    strict_1.default.match(moveDownCommand.enablement ?? "", /canMoveDown/);
+});
+(0, node_test_1.default)("manifest contributes personalization actions for projects and folders in edit mode", () => {
+    const manifest = readManifest();
+    const commands = manifest.contributes.commands;
+    const menuItems = manifest.contributes.menus["view/item/context"];
+    const editMenuItem = menuItems.find((item) => item.command === "shelfy.editItemPersonalization");
+    const revertMenuItem = menuItems.find((item) => item.command === "shelfy.revertItemPersonalization");
+    strict_1.default.ok(commands.some((command) => command.command === "shelfy.editItemPersonalization"));
+    strict_1.default.ok(commands.some((command) => command.command === "shelfy.revertItemPersonalization"));
+    strict_1.default.ok(editMenuItem, "Expected to find menu contribution for shelfy.editItemPersonalization");
+    strict_1.default.ok(revertMenuItem, "Expected to find menu contribution for shelfy.revertItemPersonalization");
+    strict_1.default.match(editMenuItem.when ?? "", /shelfy\.editMode/);
+    strict_1.default.match(editMenuItem.when ?? "", /viewItem =~ \/\^group/);
+    strict_1.default.match(editMenuItem.when ?? "", /viewItem =~ \/\^project/);
+    strict_1.default.match(revertMenuItem.when ?? "", /hasPersonalization/);
+});
+(0, node_test_1.default)("store reorders projects and folders within their current level", async () => {
+    const store = new store_1.ProjectStore(createStoreContext({
+        [STORAGE_KEY]: {
+            version: 2,
+            children: createTree()
+        }
+    }));
+    await store.moveNode("web-app", "frontend", 1);
+    await store.moveNode("backend", undefined, 0);
+    const data = store.read();
+    strict_1.default.deepEqual(data.children.map((node) => node.id), ["backend", "frontend", "root-tool"]);
+    const frontend = data.children[1];
+    strict_1.default.equal(frontend?.kind, "group");
+    if (!frontend || frontend.kind !== "group") {
+        throw new Error("Expected frontend group.");
+    }
+    strict_1.default.deepEqual(frontend.children.map((node) => node.id), ["components", "web-app"]);
+});
+(0, node_test_1.default)("store saves and clears personalization for folders and projects", async () => {
+    const store = new store_1.ProjectStore(createStoreContext({
+        [STORAGE_KEY]: {
+            version: 2,
+            children: createTree()
+        }
+    }));
+    await store.setNodePersonalization("frontend", {
+        color: "#123456",
+        icon: "folder"
+    });
+    await store.setNodePersonalization("root-tool", {
+        color: "rgb(12, 34, 56)",
+        icon: "star"
+    });
+    let data = store.read();
+    const frontend = data.children.find((node) => node.id === "frontend");
+    const rootTool = data.children.find((node) => node.id === "root-tool");
+    strict_1.default.equal(frontend?.kind, "group");
+    strict_1.default.equal(rootTool?.kind, "project");
+    if (!frontend || frontend.kind !== "group" || !rootTool || rootTool.kind !== "project") {
+        throw new Error("Expected test nodes to exist.");
+    }
+    strict_1.default.deepEqual(frontend.personalization, {
+        color: "#123456",
+        icon: "folder"
+    });
+    strict_1.default.deepEqual(rootTool.personalization, {
+        color: "rgb(12, 34, 56)",
+        icon: "star"
+    });
+    await store.setNodePersonalization("frontend", undefined);
+    data = store.read();
+    const updatedFrontend = data.children.find((node) => node.id === "frontend");
+    strict_1.default.equal(updatedFrontend?.kind, "group");
+    if (!updatedFrontend || updatedFrontend.kind !== "group") {
+        throw new Error("Expected frontend group to exist.");
+    }
+    strict_1.default.equal(updatedFrontend.personalization, undefined);
 });
 (0, node_test_1.default)("editing a custom script preserves its identifier and updates its values", () => {
     const project = createProjectWithScripts();
@@ -240,12 +390,52 @@ function createProjectWithScripts() {
     const titleMenuItems = manifest.contributes.menus["view/title"];
     const setFilterMenuItem = titleMenuItems.find((item) => item.command === "shelfy.setFilter");
     const clearFilterMenuItem = titleMenuItems.find((item) => item.command === "shelfy.clearFilter");
+    const sortMenuItem = titleMenuItems.find((item) => item.command === "shelfy.cycleSortFromNone");
     strict_1.default.ok(manifest.contributes.commands.some((command) => command.command === "shelfy.setFilter"));
     strict_1.default.ok(manifest.contributes.commands.some((command) => command.command === "shelfy.clearFilter"));
+    strict_1.default.ok(manifest.contributes.commands.some((command) => command.command === "shelfy.cycleSortFromNone"));
     strict_1.default.ok(setFilterMenuItem, "Expected to find menu contribution for shelfy.setFilter");
     strict_1.default.ok(clearFilterMenuItem, "Expected to find menu contribution for shelfy.clearFilter");
+    strict_1.default.ok(sortMenuItem, "Expected to find menu contribution for shelfy.cycleSortFromNone");
     strict_1.default.match(setFilterMenuItem.when ?? "", /view == shelfyView/);
     strict_1.default.match(clearFilterMenuItem.when ?? "", /shelfy\.hasFilter/);
+    strict_1.default.match(sortMenuItem.when ?? "", /shelfy\.sortMode == none/);
+    strict_1.default.equal(setFilterMenuItem.group, "navigation@1");
+    strict_1.default.equal(clearFilterMenuItem.group, "navigation@2");
+    strict_1.default.equal(sortMenuItem.group, "navigation@3");
+});
+(0, node_test_1.default)("manifest contributes a settings action last in the view title", () => {
+    const manifest = readManifest();
+    const titleMenuItems = manifest.contributes.menus["view/title"];
+    const settingsMenuItem = titleMenuItems.find((item) => item.command === "shelfy.openSettings");
+    const settingsCommand = manifest.contributes.commands.find((command) => command.command === "shelfy.openSettings");
+    strict_1.default.ok(settingsCommand, "Expected to find command contribution for shelfy.openSettings");
+    strict_1.default.equal(settingsCommand.icon, "$(settings-gear)");
+    strict_1.default.ok(settingsMenuItem, "Expected to find menu contribution for shelfy.openSettings");
+    strict_1.default.match(settingsMenuItem.when ?? "", /view == shelfyView/);
+    strict_1.default.equal(settingsMenuItem.group, "navigation@8");
+    for (const menuItem of titleMenuItems) {
+        if (menuItem.command === "shelfy.openSettings") {
+            continue;
+        }
+        const match = menuItem.group?.match(/@(\d+)$/);
+        if (match) {
+            strict_1.default.ok(Number(match[1]) < 8, `Expected ${menuItem.command} to appear before shelfy.openSettings`);
+        }
+    }
+});
+(0, node_test_1.default)("manifest hides edit mode toggle while a filter is active", () => {
+    const titleMenuItems = readManifest().contributes.menus["view/title"];
+    const enableEditModeMenuItem = titleMenuItems.find((item) => item.command === "shelfy.enableEditMode");
+    strict_1.default.ok(enableEditModeMenuItem, "Expected to find menu contribution for shelfy.enableEditMode");
+    strict_1.default.match(enableEditModeMenuItem.when ?? "", /!shelfy\.hasFilter/);
+});
+(0, node_test_1.default)("manifest contributes a clear filter lens icon", () => {
+    const command = readManifest().contributes.commands.find((candidate) => candidate.command === "shelfy.clearFilter");
+    strict_1.default.deepEqual(command?.icon, {
+        light: "media/light/clear-filter.svg",
+        dark: "media/dark/clear-filter.svg"
+    });
 });
 (0, node_test_1.default)("manifest contributes shelfy settings and deprecates legacy aliases", () => {
     const properties = readManifest().contributes.configuration.properties;
@@ -253,5 +443,42 @@ function createProjectWithScripts() {
     strict_1.default.ok(properties["shelfy.showProjectPath"]);
     strict_1.default.match(properties["globalProjects.clickAction"]?.deprecationMessage ?? "", /shelfy\.clickAction/);
     strict_1.default.match(properties["globalProjects.showProjectPath"]?.deprecationMessage ?? "", /shelfy\.showProjectPath/);
+});
+(0, node_test_1.default)("store falls back to legacy data when v2 storage only contains the empty root", () => {
+    const legacyData = {
+        version: 2,
+        children: [
+            {
+                kind: "project",
+                id: "legacy-project",
+                name: "Legacy Project",
+                projectPath: "C:\\projects\\legacy-project"
+            }
+        ]
+    };
+    const store = new store_1.ProjectStore(createStoreContext({
+        [STORAGE_KEY]: { version: 2, children: [] },
+        [LEGACY_STORAGE_KEY]: legacyData
+    }));
+    strict_1.default.deepEqual(store.read(), legacyData);
+});
+(0, node_test_1.default)("writing v2 data clears legacy storage so empty trees stay empty", async () => {
+    const legacyData = {
+        version: 2,
+        children: [
+            {
+                kind: "project",
+                id: "legacy-project",
+                name: "Legacy Project",
+                projectPath: "C:\\projects\\legacy-project"
+            }
+        ]
+    };
+    const store = new store_1.ProjectStore(createStoreContext({
+        [STORAGE_KEY]: { version: 2, children: [] },
+        [LEGACY_STORAGE_KEY]: legacyData
+    }));
+    await store.write({ version: 2, children: [] });
+    strict_1.default.deepEqual(store.read(), { version: 2, children: [] });
 });
 //# sourceMappingURL=editModeBehavior.test.js.map

@@ -1,8 +1,14 @@
+export type NodePersonalization = {
+  color?: string;
+  icon?: string;
+};
+
 export type GroupNodeData = {
   kind: "group";
   id: string;
   name: string;
   children: NodeData[];
+  personalization?: NodePersonalization;
 };
 
 export type PackageProjectScriptData = {
@@ -28,6 +34,7 @@ export type ProjectNodeData = {
   name: string;
   projectPath: string;
   scripts?: ProjectScriptData[];
+  personalization?: NodePersonalization;
 };
 
 export type NodeData = GroupNodeData | ProjectNodeData;

@@ -40,6 +40,8 @@ const os = __importStar(require("os"));
 const path = __importStar(require("path"));
 const vscode = __importStar(require("vscode"));
 const config_1 = require("./config");
+const personalization_1 = require("./personalization");
+const personalizationEditor_1 = require("./personalizationEditor");
 const projectScripts_1 = require("./projectScripts");
 const store_1 = require("./store");
 const tree_1 = require("./tree");
@@ -61,6 +63,7 @@ async function activate(context) {
     await setEffectiveClickActionContext();
     await setFilterContext(provider);
     let editMode = false;
+    let treeEditable = false;
     let treeView;
     let treeViewDisposables = [];
     const updateTreeViewState = () => {
@@ -78,7 +81,7 @@ async function activate(context) {
             treeDataProvider: provider,
             showCollapseAll: true
         };
-        if ((0, treeBehavior_1.getShelfyTreeMimeTypes)(editMode).length > 0) {
+        if ((0, treeBehavior_1.getShelfyTreeMimeTypes)(treeEditable).length > 0) {
             treeViewOptions.dragAndDropController = provider;
         }
         treeView = vscode.window.createTreeView("shelfyView", treeViewOptions);
@@ -97,11 +100,38 @@ async function activate(context) {
             })
         ];
     };
-    const setEditMode = async (enabled) => {
-        editMode = enabled;
-        await vscode.commands.executeCommand("setContext", "shelfy.editMode", enabled);
-        provider.setEditMode(enabled);
+    const applyTreeEditability = async () => {
+        const nextTreeEditable = (0, treeBehavior_1.isShelfyTreeEditable)(editMode, provider.hasFilter());
+        if (nextTreeEditable === treeEditable) {
+            return;
+        }
+        treeEditable = nextTreeEditable;
+        await vscode.commands.executeCommand("setContext", "shelfy.editMode", treeEditable);
+        provider.setEditMode(treeEditable);
         registerTreeView();
+    };
+    const ensureTreeEditable = async () => {
+        if (provider.hasFilter()) {
+            await vscode.window.showInformationMessage("Clear the active filter before editing the Shelfy list.");
+            return false;
+        }
+        return treeEditable;
+    };
+    const requireTreeEditable = (callback) => {
+        return async (...args) => {
+            if (!(await ensureTreeEditable())) {
+                return;
+            }
+            await callback(...args);
+        };
+    };
+    const setEditMode = async (enabled) => {
+        if (enabled && provider.hasFilter()) {
+            await vscode.window.showInformationMessage("Clear the active filter before entering edit mode.");
+            return;
+        }
+        editMode = enabled;
+        await applyTreeEditability();
     };
     registerTreeView();
     context.subscriptions.push({
@@ -130,21 +160,28 @@ async function activate(context) {
             return;
         }
         await provider.setFilterText(filterText);
+        if (provider.hasFilter()) {
+            editMode = false;
+        }
         updateTreeViewState();
         await setFilterContext(provider);
+        await applyTreeEditability();
     }), ...registerShelfyCommand("shelfy.clearFilter", async () => {
         await provider.setFilterText(undefined);
         updateTreeViewState();
         await setFilterContext(provider);
+        await applyTreeEditability();
     }), ...registerShelfyCommand("shelfy.exportConfiguration", async () => {
         await exportConfiguration(store);
     }), ...registerShelfyCommand("shelfy.importConfiguration", async () => {
         await importConfiguration(store, provider);
-    }), ...registerShelfyCommand("shelfy.addRootGroup", async () => {
+    }), ...registerShelfyCommand("shelfy.openSettings", async () => {
+        await vscode.commands.executeCommand("workbench.action.openSettings", `@ext:${context.extension.id}`);
+    }), ...registerShelfyCommand("shelfy.addRootGroup", requireTreeEditable(async () => {
         await createGroup(store, provider);
-    }), ...registerShelfyCommand("shelfy.addSubgroup", async (item) => {
+    })), ...registerShelfyCommand("shelfy.addSubgroup", requireTreeEditable(async (item) => {
         await createGroup(store, provider, item.group.id);
-    }), ...registerShelfyCommand("shelfy.addProject", async (target) => {
+    })), ...registerShelfyCommand("shelfy.addProject", requireTreeEditable(async (target) => {
         const picked = await vscode.window.showOpenDialog({
             canSelectFiles: false,
             canSelectFolders: true,
@@ -174,7 +211,7 @@ async function activate(context) {
         catch (error) {
             await vscode.window.showErrorMessage(asMessage(error));
         }
-    }), ...registerShelfyCommand("shelfy.renameGroup", async (item) => {
+    })), ...registerShelfyCommand("shelfy.renameGroup", requireTreeEditable(async (item) => {
         const name = await vscode.window.showInputBox({
             prompt: "New folder name",
             value: item.group.name
@@ -189,7 +226,7 @@ async function activate(context) {
         catch (error) {
             await vscode.window.showErrorMessage(asMessage(error));
         }
-    }), ...registerShelfyCommand("shelfy.renameProject", async (item) => {
+    })), ...registerShelfyCommand("shelfy.renameProject", requireTreeEditable(async (item) => {
         const name = await vscode.window.showInputBox({
             prompt: "New project name",
             value: item.project.name
@@ -204,11 +241,15 @@ async function activate(context) {
         catch (error) {
             await vscode.window.showErrorMessage(asMessage(error));
         }
-    }), ...registerShelfyCommand("shelfy.addProjectScript", async (item) => {
+    })), ...registerShelfyCommand("shelfy.editItemPersonalization", requireTreeEditable(async (item) => {
+        await editItemPersonalization(store, provider, item);
+    })), ...registerShelfyCommand("shelfy.revertItemPersonalization", requireTreeEditable(async (item) => {
+        await revertItemPersonalization(store, provider, item);
+    })), ...registerShelfyCommand("shelfy.addProjectScript", requireTreeEditable(async (item) => {
         await addProjectScript(store, provider, item);
-    }), ...registerShelfyCommand("shelfy.editProjectScript", async (item) => {
+    })), ...registerShelfyCommand("shelfy.editProjectScript", requireTreeEditable(async (item) => {
         await editProjectScript(store, provider, item);
-    }), ...registerShelfyCommand("shelfy.removeProjectScript", async (item) => {
+    })), ...registerShelfyCommand("shelfy.removeProjectScript", requireTreeEditable(async (item) => {
         const label = getProjectScriptLabel(item.script);
         const answer = await vscode.window.showWarningMessage(`Remove script "${label}"?`, { modal: true }, "Remove");
         if (answer !== "Remove") {
@@ -221,7 +262,7 @@ async function activate(context) {
         catch (error) {
             await vscode.window.showErrorMessage(asMessage(error));
         }
-    }), ...registerShelfyCommand("shelfy.runProjectScript", async (item) => {
+    })), ...registerShelfyCommand("shelfy.runProjectScript", async (item) => {
         try {
             const command = await (0, projectScripts_1.resolveProjectScriptCommand)(item.project.projectPath, item.script);
             const terminal = vscode.window.createTerminal({
@@ -234,7 +275,7 @@ async function activate(context) {
         catch (error) {
             await vscode.window.showErrorMessage(asMessage(error));
         }
-    }), ...registerShelfyCommand("shelfy.removeItem", async (item) => {
+    }), ...registerShelfyCommand("shelfy.removeItem", requireTreeEditable(async (item) => {
         const label = item instanceof tree_1.GroupItem ? item.group.name : item.project.name;
         const answer = await vscode.window.showWarningMessage(`Remove "${label}"?`, { modal: true }, "Remove");
         if (answer !== "Remove") {
@@ -247,9 +288,13 @@ async function activate(context) {
         catch (error) {
             await vscode.window.showErrorMessage(asMessage(error));
         }
-    }), ...registerShelfyCommand("shelfy.moveItemToFolder", async (item) => {
+    })), ...registerShelfyCommand("shelfy.moveItemToFolder", requireTreeEditable(async (item) => {
         await moveItemToFolder(store, provider, item);
-    }), ...registerShelfyCommand("shelfy.openProject", async (item) => {
+    })), ...registerShelfyCommand("shelfy.moveItemUp", requireTreeEditable(async (item) => {
+        await moveItemWithinLevel(store, provider, "up", item);
+    })), ...registerShelfyCommand("shelfy.moveItemDown", requireTreeEditable(async (item) => {
+        await moveItemWithinLevel(store, provider, "down", item);
+    })), ...registerShelfyCommand("shelfy.openProject", async (item) => {
         await openProjectInCurrentWindow(item);
     }), ...registerShelfyCommand("shelfy.openProjectInNewWindow", async (item) => {
         await openProjectInNewWindow(item);
@@ -257,7 +302,7 @@ async function activate(context) {
         await vscode.commands.executeCommand("revealFileInOS", vscode.Uri.file(item.project.projectPath));
     }), ...registerShelfyCommand("shelfy.openProjectFromRow", async (item) => {
         await openProjectFromRow(item);
-    }), ...registerShelfyCommand("shelfy.cloneGroupWithNewBase", async (item) => {
+    }), ...registerShelfyCommand("shelfy.cloneGroupWithNewBase", requireTreeEditable(async (item) => {
         const picked = await vscode.window.showOpenDialog({
             canSelectFiles: false,
             canSelectFolders: true,
@@ -283,7 +328,7 @@ async function activate(context) {
         catch (error) {
             await vscode.window.showErrorMessage(asMessage(error));
         }
-    }), ...registerShelfyCommand("shelfy.enableEditMode", async () => {
+    })), ...registerShelfyCommand("shelfy.enableEditMode", async () => {
         await setEditMode(true);
     }), ...registerShelfyCommand("shelfy.disableEditMode", async () => {
         await setEditMode(false);
@@ -318,6 +363,15 @@ async function openProjectInNewWindow(item) {
 function getClickAction() {
     return (0, config_1.getShelfySetting)("clickAction", "openSameInstance");
 }
+function getItemLabel(item) {
+    return item instanceof tree_1.GroupItem ? item.group.name : item.project.name;
+}
+function getItemNodeId(item) {
+    return item instanceof tree_1.GroupItem ? item.group.id : item.project.id;
+}
+function getItemPersonalization(item) {
+    return item instanceof tree_1.GroupItem ? item.group.personalization : item.project.personalization;
+}
 async function setEffectiveClickActionContext() {
     await vscode.commands.executeCommand("setContext", "shelfy.clickAction", getClickAction());
 }
@@ -333,6 +387,62 @@ async function createGroup(store, provider, parentGroupId) {
     }
     try {
         await store.addGroup(name, parentGroupId);
+        provider.refresh();
+    }
+    catch (error) {
+        await vscode.window.showErrorMessage(asMessage(error));
+    }
+}
+async function editItemPersonalization(store, provider, item) {
+    if (!(item instanceof tree_1.GroupItem) && !(item instanceof tree_1.ProjectItem)) {
+        await vscode.window.showInformationMessage("Use Edit Personalization from a Shelfy project or folder.");
+        return;
+    }
+    const current = getItemPersonalization(item);
+    const label = getItemLabel(item);
+    const projectConfigColor = item instanceof tree_1.ProjectItem
+        ? await provider.getProjectConfigurationColor(item.project.projectPath)
+        : undefined;
+    const next = await (0, personalizationEditor_1.showPersonalizationEditor)({
+        label,
+        kind: item instanceof tree_1.GroupItem ? "group" : "project",
+        personalization: current,
+        projectConfigColor
+    });
+    if (!next) {
+        return;
+    }
+    await saveItemPersonalization(store, provider, item, next);
+}
+async function revertItemPersonalization(store, provider, item) {
+    if (!(item instanceof tree_1.GroupItem) && !(item instanceof tree_1.ProjectItem)) {
+        await vscode.window.showInformationMessage("Use Revert Personalization from a Shelfy project or folder.");
+        return;
+    }
+    try {
+        await store.setNodePersonalization(getItemNodeId(item), undefined);
+        provider.refresh();
+    }
+    catch (error) {
+        await vscode.window.showErrorMessage(asMessage(error));
+    }
+}
+async function saveItemPersonalization(store, provider, item, update) {
+    const current = getItemPersonalization(item);
+    const personalization = (0, personalization_1.normalizeNodePersonalization)({
+        color: update.color === undefined
+            ? current?.color
+            : update.color === null
+                ? undefined
+                : update.color,
+        icon: update.icon === undefined
+            ? current?.icon
+            : update.icon === null
+                ? undefined
+                : update.icon
+    });
+    try {
+        await store.setNodePersonalization(getItemNodeId(item), personalization);
         provider.refresh();
     }
     catch (error) {
@@ -365,6 +475,27 @@ async function moveItemToFolder(store, provider, item) {
         if (picked.targetGroupId) {
             await provider.markExpanded(picked.targetGroupId);
         }
+        provider.refresh();
+    }
+    catch (error) {
+        await vscode.window.showErrorMessage(asMessage(error));
+    }
+}
+async function moveItemWithinLevel(store, provider, direction, item) {
+    if (!(item instanceof tree_1.GroupItem) && !(item instanceof tree_1.ProjectItem)) {
+        await vscode.window.showInformationMessage(`Use Move ${direction === "up" ? "Up" : "Down"} from a Shelfy project or folder.`);
+        return;
+    }
+    const nodeId = item instanceof tree_1.GroupItem ? item.group.id : item.project.id;
+    const label = item instanceof tree_1.GroupItem ? item.group.name : item.project.name;
+    const adjacentMoveTargets = (0, treeBehavior_1.getAdjacentMoveTargets)(store.read().children, nodeId);
+    const target = direction === "up" ? adjacentMoveTargets.up : adjacentMoveTargets.down;
+    if (!target) {
+        await vscode.window.showInformationMessage(`"${label}" is already the ${direction === "up" ? "first" : "last"} item in its level.`);
+        return;
+    }
+    try {
+        await store.moveNode(nodeId, target.parentGroupId, target.targetIndex);
         provider.refresh();
     }
     catch (error) {

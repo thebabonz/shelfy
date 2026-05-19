@@ -4,11 +4,17 @@ import * as vscode from "vscode";
 import {
   GroupNodeData,
   NewProjectScriptData,
+  NodePersonalization,
   NodeData,
   ProjectNodeData,
   ProjectScriptData,
   RootData
 } from "./model";
+import {
+  isKnownFontAwesomeIcon,
+  normalizeNodePersonalization
+} from "./personalization";
+import { isColorValue } from "./projectColor";
 import { addProjectScriptsToProject, updateProjectScriptInProject } from "./projectScriptState";
 
 const STORAGE_KEY = "shelfy.data.v2";
@@ -18,9 +24,16 @@ export class ProjectStore {
   constructor(private readonly context: vscode.ExtensionContext) {}
 
   read(): RootData {
+    const stored = this.context.globalState.get<RootData>(STORAGE_KEY);
+    const legacy = this.context.globalState.get<RootData>(LEGACY_STORAGE_KEY);
+
+    if (isEmptyRootData(stored) && hasRootChildren(legacy)) {
+      return legacy;
+    }
+
     return (
-      this.context.globalState.get<RootData>(STORAGE_KEY) ??
-      this.context.globalState.get<RootData>(LEGACY_STORAGE_KEY) ?? {
+      stored ??
+      legacy ?? {
         version: 2,
         children: []
       }
@@ -39,6 +52,7 @@ export class ProjectStore {
 
   async write(data: RootData): Promise<void> {
     await this.context.globalState.update(STORAGE_KEY, data);
+    await this.context.globalState.update(LEGACY_STORAGE_KEY, undefined);
   }
 
   getParentGroupId(nodeId: string): string | undefined {
@@ -86,6 +100,20 @@ export class ProjectStore {
       throw new Error("Project not found.");
     }
     project.name = newName;
+    await this.write(data);
+  }
+
+  async setNodePersonalization(
+    nodeId: string,
+    personalization: NodePersonalization | undefined
+  ): Promise<void> {
+    const data = this.read();
+    const node = findNodeById(data.children, nodeId);
+    if (!node) {
+      throw new Error("Item not found.");
+    }
+
+    node.personalization = cloneNodePersonalization(personalization);
     await this.write(data);
   }
 
@@ -252,6 +280,14 @@ export function normalizeProjectPath(input: string): string {
   return path.normalize(input);
 }
 
+function hasRootChildren(data: RootData | undefined): data is RootData {
+  return data !== undefined && data.children.length > 0;
+}
+
+function isEmptyRootData(data: RootData | undefined): data is RootData {
+  return data !== undefined && data.children.length === 0;
+}
+
 export function findGroup(nodes: NodeData[], groupId: string): GroupNodeData | undefined {
   for (const node of nodes) {
     if (node.kind === "group") {
@@ -400,6 +436,7 @@ function deepCloneGroupWithRebase(group: GroupNodeData, oldBase: string, newBase
     kind: "group",
     id: crypto.randomUUID(),
     name: newName,
+    personalization: cloneNodePersonalization(group.personalization),
     children: group.children.map((child) => {
       if (child.kind === "group") {
         return deepCloneGroupWithRebase(child, oldBase, newBase, child.name);
@@ -409,7 +446,8 @@ function deepCloneGroupWithRebase(group: GroupNodeData, oldBase: string, newBase
           id: crypto.randomUUID(),
           name: child.name,
           projectPath: rebasePath(child.projectPath, oldBase, newBase),
-          scripts: child.scripts?.map(cloneProjectScript)
+          scripts: child.scripts?.map(cloneProjectScript),
+          personalization: cloneNodePersonalization(child.personalization)
         };
       }
     })
@@ -496,7 +534,11 @@ function normalizeNode(
       kind: "group",
       id: getUniqueId(record.id, usedIds),
       name: readNonEmptyString(record.name, `Group name at ${location}`),
-      children: normalizeNodes(record.children ?? [], usedIds, projectPaths, `${location}.children`)
+      children: normalizeNodes(record.children ?? [], usedIds, projectPaths, `${location}.children`),
+      personalization: normalizeOptionalNodePersonalization(
+        record.personalization,
+        `${location}.personalization`
+      )
     };
   }
 
@@ -516,7 +558,11 @@ function normalizeNode(
       id: getUniqueId(record.id, usedIds),
       name: readNonEmptyString(record.name, `Project name at ${location}`),
       projectPath,
-      scripts: normalizeProjectScripts(record.scripts ?? [], usedIds, `${location}.scripts`)
+      scripts: normalizeProjectScripts(record.scripts ?? [], usedIds, `${location}.scripts`),
+      personalization: normalizeOptionalNodePersonalization(
+        record.personalization,
+        `${location}.personalization`
+      )
     };
   }
 
@@ -578,6 +624,47 @@ function normalizeProjectScript(
   throw new Error(`Unsupported script kind at ${location}.`);
 }
 
+function normalizeOptionalNodePersonalization(
+  value: unknown,
+  location: string
+): NodePersonalization | undefined {
+  if (value === undefined) {
+    return undefined;
+  }
+
+  const record = asRecord(value, `Invalid personalization at ${location}.`);
+  const color = readOptionalColor(record.color, `${location}.color`);
+  const icon = readOptionalFontAwesomeIcon(record.icon, `${location}.icon`);
+
+  return normalizeNodePersonalization({ color, icon });
+}
+
+function readOptionalColor(value: unknown, label: string): string | undefined {
+  if (value === undefined) {
+    return undefined;
+  }
+
+  const color = readNonEmptyString(value, label);
+  if (!isColorValue(color)) {
+    throw new Error(`${label} must be a valid color value.`);
+  }
+
+  return color;
+}
+
+function readOptionalFontAwesomeIcon(value: unknown, label: string): string | undefined {
+  if (value === undefined) {
+    return undefined;
+  }
+
+  const iconName = readNonEmptyString(value, label);
+  if (!isKnownFontAwesomeIcon(iconName)) {
+    throw new Error(`${label} must be a valid Font Awesome Free Solid icon name.`);
+  }
+
+  return iconName;
+}
+
 function asRecord(value: unknown, message: string): Record<string, unknown> {
   if (typeof value !== "object" || value === null || Array.isArray(value)) {
     throw new Error(message);
@@ -613,4 +700,27 @@ function getUniqueId(value: unknown, usedIds: Set<string>): string {
 
   usedIds.add(generated);
   return generated;
+}
+
+function findNodeById(nodes: NodeData[], nodeId: string): GroupNodeData | ProjectNodeData | undefined {
+  for (const node of nodes) {
+    if (node.id === nodeId) {
+      return node;
+    }
+
+    if (node.kind === "group") {
+      const nested = findNodeById(node.children, nodeId);
+      if (nested) {
+        return nested;
+      }
+    }
+  }
+
+  return undefined;
+}
+
+function cloneNodePersonalization(
+  personalization: NodePersonalization | undefined
+): NodePersonalization | undefined {
+  return normalizeNodePersonalization(personalization);
 }

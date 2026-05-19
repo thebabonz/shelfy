@@ -14,6 +14,20 @@ export type MoveDestination = {
   targetIndex: number;
 };
 
+export type AdjacentMoveTarget = {
+  parentGroupId: string | undefined;
+  targetIndex: number;
+};
+
+export type AdjacentMoveTargets = {
+  up: AdjacentMoveTarget | undefined;
+  down: AdjacentMoveTarget | undefined;
+};
+
+export function isShelfyTreeEditable(editMode: boolean, hasFilter: boolean): boolean {
+  return editMode && !hasFilter;
+}
+
 export function getShelfyTreeMimeTypes(editMode: boolean): readonly string[] {
   // VS Code snapshots tree drag/drop MIME types when the controller is
   // registered, so edit-mode toggles recreate the tree view.
@@ -57,9 +71,41 @@ export function getMoveDestinations(
   return destinations;
 }
 
+export function getAdjacentMoveTargets(
+  nodes: NodeData[],
+  sourceNodeId: string
+): AdjacentMoveTargets {
+  const source = findNodeInfo(nodes, sourceNodeId);
+  if (!source) {
+    return {
+      up: undefined,
+      down: undefined
+    };
+  }
+
+  return {
+    up:
+      source.index > 0
+        ? {
+            parentGroupId: source.parentGroupId,
+            targetIndex: source.index - 1
+          }
+        : undefined,
+    down:
+      source.index < source.siblingCount - 1
+        ? {
+            parentGroupId: source.parentGroupId,
+            targetIndex: source.index + 1
+          }
+        : undefined
+  };
+}
+
 type NodeInfo = {
   node: NodeData;
   parentGroupId: string | undefined;
+  index: number;
+  siblingCount: number;
 };
 
 function collectGroupDestinations(
@@ -111,11 +157,14 @@ function findNodeInfo(
   sourceNodeId: string,
   parentGroupId: string | undefined = undefined
 ): NodeInfo | undefined {
-  for (const node of nodes) {
+  for (let index = 0; index < nodes.length; index += 1) {
+    const node = nodes[index];
     if (node.id === sourceNodeId) {
       return {
         node,
-        parentGroupId
+        parentGroupId,
+        index,
+        siblingCount: nodes.length
       };
     }
 

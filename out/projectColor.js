@@ -34,6 +34,7 @@ var __importStar = (this && this.__importStar) || (function () {
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.readProjectColor = readProjectColor;
+exports.isColorValue = isColorValue;
 const fs = __importStar(require("fs/promises"));
 const path = __importStar(require("path"));
 const jsonc_parser_1 = require("jsonc-parser");
