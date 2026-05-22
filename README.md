@@ -6,6 +6,7 @@ Manage and organize project folders globally in Visual Studio Code — independe
 
 - 📁 Save project directories globally (not tied to any workspace)
 - 🗂 Organize projects into virtual groups and nested folders
+- ✏️ Toggle edit mode so day-to-day opening stays separate from list editing
 - 🎨 Display project color based on:
 
 .vscode/settings.json → workbench.colorCustomizations → titleBar.activeBackground
@@ -15,9 +16,13 @@ or Peacock workspace color:
 .vscode/settings.json → peacock.color
 
 - 🔄 Auto-refresh project color when settings change
+- 🧩 Personalize folders and projects with custom colors and Font Awesome icons
 - 🧲 Drag & drop to reorder and regroup projects
+- ↕️ Move folders, projects, and scripts up or down from the context menu
 - 🚫 Prevent duplicate project paths
+- ⚠️ Show missing project folders and relink them with **Change Project Folder...**
 - ⚡ Quick open projects directly from the sidebar
+- ▶️ Add, edit, and run project scripts from the sidebar
 - 💾 Import or export the full folders, projects, and scripts configuration as JSON
 
 ---
@@ -38,22 +43,44 @@ or Peacock workspace color:
 
 ### Organize projects
 
-- Right-click to:
-- Add groups
-- Rename folders
-- Rename projects
-- Remove items
-- Drag & drop:
-- Move projects between groups
-- Reorder items
-- Nest groups
+- Click **Enable Edit Mode** in the Shelfy view title before changing the tree
+- Right-click folders or projects to add folders, add projects, rename, personalize, move, relink, or remove items
+- Use **Move Up** and **Move Down** to reorder folders and projects within their current level
+- Use **Move to Folder...** or drag and drop to move projects and folders between virtual folders
+- Use drag and drop to reorder items and nest groups
 - Sort mode button in the view title cycles: none -> ascending -> descending
 - Sorting applies to groups and items within each group
+- Filtering disables edit mode until the filter is cleared
 
 ### Open a project
 
-- Click a project row → behavior is controlled by `shelfy.clickAction`
+- Click a project row -> behavior is controlled by `shelfy.clickAction`
 - Use inline actions to open in current window or new window directly
+- Missing folders are shown with a warning icon; open actions are disabled until the path is fixed
+
+### Fix a missing project folder
+
+If a saved folder was moved, renamed, or deleted, Shelfy marks the project as missing.
+
+1. Click **Enable Edit Mode**
+2. Right-click the missing project
+3. Choose **Change Project Folder...**
+4. Select the new folder location
+
+The project keeps its display name, scripts, personalization, and position.
+
+### Run project scripts
+
+- Right-click a project in edit mode and choose **Add Script**
+- Add scripts from `package.json` or enter a custom terminal command
+- Outside edit mode, click a script row or use **Run Script** to run it in a terminal
+- Use **Move Up** and **Move Down** to reorder scripts within their project
+
+### Personalize items
+
+- In edit mode, use **Edit Personalization** on folders or projects
+- Set a custom color, a Font Awesome Free Solid icon, or both
+- Use **Revert Personalization** to return to the default icon/color behavior
 
 ### Import or export configuration
 

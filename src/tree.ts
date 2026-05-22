@@ -64,7 +64,8 @@ export class ProjectItem extends vscode.TreeItem {
     showPath = true,
     editMode = false,
     expandScripts = editMode,
-    contextValue = "project"
+    contextValue = "project",
+    projectPathExists = true
   ) {
     const scriptCount = project.scripts?.length ?? 0;
 
@@ -79,14 +80,23 @@ export class ProjectItem extends vscode.TreeItem {
 
     this.id = project.id;
     this.contextValue = contextValue;
-    this.description = showPath ? project.projectPath : undefined;
+    this.description = projectPathExists
+      ? showPath
+        ? project.projectPath
+        : undefined
+      : showPath
+        ? `Missing: ${project.projectPath}`
+        : "Missing path";
     const scriptSummary = scriptCount > 0 ? `\nScripts: ${scriptCount}` : "";
     const colorSummary = projectColor ? `\nColor: ${projectColor}` : "";
     const iconSummary = projectIcon ? `\nIcon: ${projectIcon}` : "";
-    this.tooltip = `${project.projectPath}${colorSummary}${iconSummary}${scriptSummary}`;
+    const pathSummary = projectPathExists
+      ? project.projectPath
+      : `Missing path\n${project.projectPath}`;
+    this.tooltip = `${pathSummary}${colorSummary}${iconSummary}${scriptSummary}`;
 
     const command = getProjectRowCommandDefinition(editMode);
-    if (command) {
+    if (command && projectPathExists) {
       this.command = {
         ...command,
         arguments: [this]
@@ -287,8 +297,9 @@ export class ShelfyProvider
           : vscode.TreeItemCollapsibleState.Collapsed;
         items.push(item);
       } else {
+        const projectPathExists = await isDirectory(node.projectPath);
         const color = await this.resolveProjectDisplayColor(node);
-        const iconPath = await this.resolveProjectIconPath(node, color);
+        const iconPath = await this.resolveProjectIconPath(node, color, projectPathExists);
         const showPath = getShelfySetting<boolean>("showProjectPath", false);
 
         items.push(
@@ -303,8 +314,10 @@ export class ShelfyProvider
             getMoveContextValue(
               "project",
               adjacentMoveTargets,
-              hasNodePersonalization(node.personalization)
-            )
+              hasNodePersonalization(node.personalization),
+              projectPathExists ? [] : ["missingPath"]
+            ),
+            projectPathExists
           )
         );
       }
@@ -449,8 +462,13 @@ export class ShelfyProvider
 
   private async resolveProjectIconPath(
     project: ProjectNodeData,
-    color: string | undefined
+    color: string | undefined,
+    projectPathExists: boolean
   ): Promise<vscode.ThemeIcon | vscode.Uri> {
+    if (!projectPathExists) {
+      return new vscode.ThemeIcon("warning", new vscode.ThemeColor("problemsWarningIcon.foreground"));
+    }
+
     const personalizedIcon = await getOrCreatePersonalizedIcon(
       this.context,
       project.personalization,
@@ -563,7 +581,8 @@ export class ShelfyProvider
 function getMoveContextValue(
   kind: "group" | "project" | "script",
   adjacentMoveTargets: AdjacentMoveTargets,
-  hasPersonalization = false
+  hasPersonalization = false,
+  extraContextValues: string[] = []
 ): string {
   const contextValues: string[] = [kind];
 
@@ -578,6 +597,8 @@ function getMoveContextValue(
   if (hasPersonalization) {
     contextValues.push("hasPersonalization");
   }
+
+  contextValues.push(...extraContextValues);
 
   return contextValues.join(":");
 }
@@ -602,6 +623,15 @@ function collectProjects(nodes: NodeData[]): ProjectNodeData[] {
   }
 
   return result;
+}
+
+async function isDirectory(projectPath: string): Promise<boolean> {
+  try {
+    const stat = await fs.stat(projectPath);
+    return stat.isDirectory();
+  } catch {
+    return false;
+  }
 }
 
 async function getOrCreateColorIcon(

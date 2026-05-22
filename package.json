@@ -77,6 +77,11 @@
         }
       },
       {
+        "command": "shelfy.changeProjectPath",
+        "title": "Change Project Folder...",
+        "icon": "$(folder-opened)"
+      },
+      {
         "command": "shelfy.editItemPersonalization",
         "title": "Edit Personalization",
         "icon": "$(paintcan)"
@@ -146,6 +151,7 @@
       {
         "command": "shelfy.openProject",
         "title": "Open Project",
+        "enablement": "!(viewItem =~ /(^|:)missingPath(:|$)/)",
         "icon": {
           "light": "media/light/open-project.svg",
           "dark": "media/dark/open-project.svg"
@@ -154,6 +160,7 @@
       {
         "command": "shelfy.openProjectInNewWindow",
         "title": "Open in New Window",
+        "enablement": "!(viewItem =~ /(^|:)missingPath(:|$)/)",
         "icon": {
           "light": "media/light/open-project-new-window.svg",
           "dark": "media/dark/open-project-new-window.svg"
@@ -162,6 +169,7 @@
       {
         "command": "shelfy.openInExplorer",
         "title": "Open in Explorer",
+        "enablement": "!(viewItem =~ /(^|:)missingPath(:|$)/)",
         "icon": {
           "light": "media/light/open-explorer.svg",
           "dark": "media/dark/open-explorer.svg"
@@ -364,6 +372,11 @@
           "group": "inline"
         },
         {
+          "command": "shelfy.changeProjectPath",
+          "when": "view == shelfyView && viewItem =~ /^project(?:$|:)/ && shelfy.editMode",
+          "group": "inline"
+        },
+        {
           "command": "shelfy.addProjectScript",
           "when": "view == shelfyView && viewItem =~ /^project(?:$|:)/ && shelfy.editMode",
           "group": "inline"
@@ -404,9 +417,14 @@
           "group": "2_modification@6"
         },
         {
+          "command": "shelfy.changeProjectPath",
+          "when": "view == shelfyView && viewItem =~ /^project(?:$|:)/ && shelfy.editMode",
+          "group": "2_modification@7"
+        },
+        {
           "command": "shelfy.removeItem",
           "when": "view == shelfyView && (viewItem =~ /^group(?:$|:)/ || viewItem =~ /^project(?:$|:)/) && shelfy.editMode",
-          "group": "2_modification@7"
+          "group": "2_modification@8"
         },
         {
           "command": "shelfy.runProjectScript",

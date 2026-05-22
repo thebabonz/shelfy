@@ -243,6 +243,8 @@ async function activate(context) {
         catch (error) {
             await vscode.window.showErrorMessage(asMessage(error));
         }
+    })), ...registerShelfyCommand("shelfy.changeProjectPath", requireTreeEditable(async (item) => {
+        await changeProjectPath(store, provider, item);
     })), ...registerShelfyCommand("shelfy.editItemPersonalization", requireTreeEditable(async (item) => {
         await editItemPersonalization(store, provider, item);
     })), ...registerShelfyCommand("shelfy.revertItemPersonalization", requireTreeEditable(async (item) => {
@@ -266,6 +268,9 @@ async function activate(context) {
         }
     })), ...registerShelfyCommand("shelfy.runProjectScript", async (item) => {
         try {
+            if (!(await ensureProjectPathExists(item.project))) {
+                return;
+            }
             const command = await (0, projectScripts_1.resolveProjectScriptCommand)(item.project.projectPath, item.script);
             const terminal = vscode.window.createTerminal({
                 name: `${item.project.name}: ${getProjectScriptLabel(item.script)}`,
@@ -301,6 +306,9 @@ async function activate(context) {
     }), ...registerShelfyCommand("shelfy.openProjectInNewWindow", async (item) => {
         await openProjectInNewWindow(item);
     }), ...registerShelfyCommand("shelfy.openInExplorer", async (item) => {
+        if (!(await ensureProjectPathExists(item.project))) {
+            return;
+        }
         await vscode.commands.executeCommand("revealFileInOS", vscode.Uri.file(item.project.projectPath));
     }), ...registerShelfyCommand("shelfy.openProjectFromRow", async (item) => {
         await openProjectFromRow(item);
@@ -348,16 +356,25 @@ async function openProjectFromRow(item) {
     if (action === "noAction") {
         return;
     }
+    if (!(await ensureProjectPathExists(item.project))) {
+        return;
+    }
     await vscode.commands.executeCommand("vscode.openFolder", vscode.Uri.file(item.project.projectPath), {
         forceNewWindow: action === "openNewInstance"
     });
 }
 async function openProjectInCurrentWindow(item) {
+    if (!(await ensureProjectPathExists(item.project))) {
+        return;
+    }
     await vscode.commands.executeCommand("vscode.openFolder", vscode.Uri.file(item.project.projectPath), {
         forceNewWindow: false
     });
 }
 async function openProjectInNewWindow(item) {
+    if (!(await ensureProjectPathExists(item.project))) {
+        return;
+    }
     await vscode.commands.executeCommand("vscode.openFolder", vscode.Uri.file(item.project.projectPath), {
         forceNewWindow: true
     });
@@ -446,6 +463,30 @@ async function saveItemPersonalization(store, provider, item, update) {
     try {
         await store.setNodePersonalization(getItemNodeId(item), personalization);
         provider.refresh();
+    }
+    catch (error) {
+        await vscode.window.showErrorMessage(asMessage(error));
+    }
+}
+async function changeProjectPath(store, provider, item) {
+    if (!(item instanceof tree_1.ProjectItem)) {
+        await vscode.window.showInformationMessage("Use Change Project Folder from a Shelfy project.");
+        return;
+    }
+    const picked = await vscode.window.showOpenDialog({
+        canSelectFiles: false,
+        canSelectFolders: true,
+        canSelectMany: false,
+        defaultUri: vscode.Uri.file(item.project.projectPath),
+        openLabel: "Select Project Folder"
+    });
+    if (!picked?.length) {
+        return;
+    }
+    try {
+        await store.updateProjectPath(item.project.id, picked[0].fsPath);
+        provider.refresh();
+        await vscode.window.showInformationMessage(`Project folder updated for "${item.project.name}".`);
     }
     catch (error) {
         await vscode.window.showErrorMessage(asMessage(error));
@@ -769,6 +810,19 @@ function getProjectScriptLabel(script) {
 }
 function asMessage(error) {
     return error instanceof Error ? error.message : "Unknown error";
+}
+async function ensureProjectPathExists(project) {
+    try {
+        const stat = await vscode.workspace.fs.stat(vscode.Uri.file(project.projectPath));
+        if (stat.type & vscode.FileType.Directory) {
+            return true;
+        }
+    }
+    catch {
+        // Fall through to the user-facing message below.
+    }
+    await vscode.window.showErrorMessage(`Project folder not found for "${project.name}": ${project.projectPath}`);
+    return false;
 }
 async function cycleSortMode(provider, nextMode) {
     await provider.setSortMode(nextMode);

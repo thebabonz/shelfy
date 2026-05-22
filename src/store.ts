@@ -103,6 +103,23 @@ export class ProjectStore {
     await this.write(data);
   }
 
+  async updateProjectPath(projectId: string, projectPath: string): Promise<void> {
+    const data = this.read();
+    const project = findProjectById(data.children, projectId);
+    if (!project) {
+      throw new Error("Project not found.");
+    }
+
+    const normalized = normalizeProjectPath(projectPath);
+    const existing = findProjectByPath(data.children, normalized);
+    if (existing && existing.id !== projectId) {
+      throw new Error(`That project is already saved as "${existing.name}".`);
+    }
+
+    project.projectPath = normalized;
+    await this.write(data);
+  }
+
   async setNodePersonalization(
     nodeId: string,
     personalization: NodePersonalization | undefined

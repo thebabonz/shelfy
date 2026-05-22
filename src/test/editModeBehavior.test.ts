@@ -157,7 +157,8 @@ test("filter mode disables tree editing affordances", () => {
 });
 
 test("manifest hides project open actions in edit mode", () => {
-  const menuItems = readManifest().contributes.menus["view/item/context"];
+  const manifest = readManifest();
+  const menuItems = manifest.contributes.menus["view/item/context"];
   const commandsToCheck = [
     "shelfy.openProject",
     "shelfy.openProjectInNewWindow",
@@ -166,8 +167,11 @@ test("manifest hides project open actions in edit mode", () => {
 
   for (const command of commandsToCheck) {
     const menuItem = menuItems.find((item) => item.command === command);
+    const commandContribution = manifest.contributes.commands.find((item) => item.command === command);
     assert.ok(menuItem, `Expected to find menu contribution for ${command}`);
+    assert.ok(commandContribution, `Expected to find command contribution for ${command}`);
     assert.match(menuItem.when ?? "", /!shelfy\.editMode/);
+    assert.match(commandContribution.enablement ?? "", /missingPath/);
   }
 });
 
@@ -301,6 +305,22 @@ test("manifest contributes personalization actions for projects and folders in e
   assert.match(revertMenuItem.when ?? "", /hasPersonalization/);
 });
 
+test("manifest contributes change project folder action for projects in edit mode", () => {
+  const manifest = readManifest();
+  const command = manifest.contributes.commands.find(
+    (candidate) => candidate.command === "shelfy.changeProjectPath"
+  );
+  const menuItem = manifest.contributes.menus["view/item/context"].find(
+    (candidate) => candidate.command === "shelfy.changeProjectPath"
+  );
+
+  assert.ok(command, "Expected command contribution for shelfy.changeProjectPath");
+  assert.ok(menuItem, "Expected menu contribution for shelfy.changeProjectPath");
+  assert.equal(command.icon, "$(folder-opened)");
+  assert.match(menuItem.when ?? "", /shelfy\.editMode/);
+  assert.match(menuItem.when ?? "", /\^project/);
+});
+
 test("store reorders projects and folders within their current level", async () => {
   const store = new ProjectStore(createStoreContext({
     [STORAGE_KEY]: {
@@ -354,6 +374,33 @@ test("store reorders scripts within their project command level", async () => {
   }
 
   assert.deepEqual(project.scripts?.map((script) => script.id), ["custom-dev", "package-test"]);
+});
+
+test("store updates project paths and keeps duplicate path protection", async () => {
+  const store = new ProjectStore(createStoreContext({
+    [STORAGE_KEY]: {
+      version: 2,
+      children: createTree()
+    }
+  }));
+
+  await store.updateProjectPath("root-tool", "C:\\projects\\root-tool-renamed");
+
+  const data = store.read();
+  const rootTool = data.children.find((node) => node.id === "root-tool");
+
+  assert.equal(rootTool?.kind, "project");
+
+  if (!rootTool || rootTool.kind !== "project") {
+    throw new Error("Expected root project.");
+  }
+
+  assert.equal(rootTool.projectPath, "C:\\projects\\root-tool-renamed");
+
+  await assert.rejects(
+    () => store.updateProjectPath("root-tool", "C:\\projects\\web-app"),
+    /already saved/
+  );
 });
 
 test("store saves and clears personalization for folders and projects", async () => {

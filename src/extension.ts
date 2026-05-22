@@ -292,6 +292,10 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       }
     })),
 
+    ...registerShelfyCommand("shelfy.changeProjectPath", requireTreeEditable(async (item?: ProjectItem) => {
+      await changeProjectPath(store, provider, item);
+    })),
+
     ...registerShelfyCommand(
       "shelfy.editItemPersonalization",
       requireTreeEditable(async (item?: GroupItem | ProjectItem) => {
@@ -336,6 +340,10 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 
     ...registerShelfyCommand("shelfy.runProjectScript", async (item: ScriptItem) => {
       try {
+        if (!(await ensureProjectPathExists(item.project))) {
+          return;
+        }
+
         const command = await resolveProjectScriptCommand(item.project.projectPath, item.script);
         const terminal = vscode.window.createTerminal({
           name: `${item.project.name}: ${getProjectScriptLabel(item.script)}`,
@@ -390,6 +398,10 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     }),
 
     ...registerShelfyCommand("shelfy.openInExplorer", async (item: ProjectItem) => {
+      if (!(await ensureProjectPathExists(item.project))) {
+        return;
+      }
+
       await vscode.commands.executeCommand("revealFileInOS", vscode.Uri.file(item.project.projectPath));
     }),
 
@@ -464,18 +476,30 @@ async function openProjectFromRow(item: ProjectItem): Promise<void> {
     return;
   }
 
+  if (!(await ensureProjectPathExists(item.project))) {
+    return;
+  }
+
   await vscode.commands.executeCommand("vscode.openFolder", vscode.Uri.file(item.project.projectPath), {
     forceNewWindow: action === "openNewInstance"
   });
 }
 
 async function openProjectInCurrentWindow(item: ProjectItem): Promise<void> {
+  if (!(await ensureProjectPathExists(item.project))) {
+    return;
+  }
+
   await vscode.commands.executeCommand("vscode.openFolder", vscode.Uri.file(item.project.projectPath), {
     forceNewWindow: false
   });
 }
 
 async function openProjectInNewWindow(item: ProjectItem): Promise<void> {
+  if (!(await ensureProjectPathExists(item.project))) {
+    return;
+  }
+
   await vscode.commands.executeCommand("vscode.openFolder", vscode.Uri.file(item.project.projectPath), {
     forceNewWindow: true
   });
@@ -604,6 +628,37 @@ async function saveItemPersonalization(
   try {
     await store.setNodePersonalization(getItemNodeId(item), personalization);
     provider.refresh();
+  } catch (error) {
+    await vscode.window.showErrorMessage(asMessage(error));
+  }
+}
+
+async function changeProjectPath(
+  store: ProjectStore,
+  provider: ShelfyProvider,
+  item?: ProjectItem
+): Promise<void> {
+  if (!(item instanceof ProjectItem)) {
+    await vscode.window.showInformationMessage("Use Change Project Folder from a Shelfy project.");
+    return;
+  }
+
+  const picked = await vscode.window.showOpenDialog({
+    canSelectFiles: false,
+    canSelectFolders: true,
+    canSelectMany: false,
+    defaultUri: vscode.Uri.file(item.project.projectPath),
+    openLabel: "Select Project Folder"
+  });
+
+  if (!picked?.length) {
+    return;
+  }
+
+  try {
+    await store.updateProjectPath(item.project.id, picked[0].fsPath);
+    provider.refresh();
+    await vscode.window.showInformationMessage(`Project folder updated for "${item.project.name}".`);
   } catch (error) {
     await vscode.window.showErrorMessage(asMessage(error));
   }
@@ -1063,6 +1118,22 @@ function getProjectScriptLabel(script: ProjectScriptData): string {
 
 function asMessage(error: unknown): string {
   return error instanceof Error ? error.message : "Unknown error";
+}
+
+async function ensureProjectPathExists(project: ProjectNodeData): Promise<boolean> {
+  try {
+    const stat = await vscode.workspace.fs.stat(vscode.Uri.file(project.projectPath));
+    if (stat.type & vscode.FileType.Directory) {
+      return true;
+    }
+  } catch {
+    // Fall through to the user-facing message below.
+  }
+
+  await vscode.window.showErrorMessage(
+    `Project folder not found for "${project.name}": ${project.projectPath}`
+  );
+  return false;
 }
 
 async function cycleSortMode(provider: ShelfyProvider, nextMode: SortMode): Promise<void> {

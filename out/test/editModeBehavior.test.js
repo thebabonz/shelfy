@@ -160,7 +160,8 @@ function createStoreContext(initialState) {
     });
 });
 (0, node_test_1.default)("manifest hides project open actions in edit mode", () => {
-    const menuItems = readManifest().contributes.menus["view/item/context"];
+    const manifest = readManifest();
+    const menuItems = manifest.contributes.menus["view/item/context"];
     const commandsToCheck = [
         "shelfy.openProject",
         "shelfy.openProjectInNewWindow",
@@ -168,8 +169,11 @@ function createStoreContext(initialState) {
     ];
     for (const command of commandsToCheck) {
         const menuItem = menuItems.find((item) => item.command === command);
+        const commandContribution = manifest.contributes.commands.find((item) => item.command === command);
         strict_1.default.ok(menuItem, `Expected to find menu contribution for ${command}`);
+        strict_1.default.ok(commandContribution, `Expected to find command contribution for ${command}`);
         strict_1.default.match(menuItem.when ?? "", /!shelfy\.editMode/);
+        strict_1.default.match(commandContribution.enablement ?? "", /missingPath/);
     }
 });
 (0, node_test_1.default)("project move destinations include folders other than its current parent", () => {
@@ -271,6 +275,16 @@ function createStoreContext(initialState) {
     strict_1.default.match(editMenuItem.when ?? "", /viewItem =~ \/\^project/);
     strict_1.default.match(revertMenuItem.when ?? "", /hasPersonalization/);
 });
+(0, node_test_1.default)("manifest contributes change project folder action for projects in edit mode", () => {
+    const manifest = readManifest();
+    const command = manifest.contributes.commands.find((candidate) => candidate.command === "shelfy.changeProjectPath");
+    const menuItem = manifest.contributes.menus["view/item/context"].find((candidate) => candidate.command === "shelfy.changeProjectPath");
+    strict_1.default.ok(command, "Expected command contribution for shelfy.changeProjectPath");
+    strict_1.default.ok(menuItem, "Expected menu contribution for shelfy.changeProjectPath");
+    strict_1.default.equal(command.icon, "$(folder-opened)");
+    strict_1.default.match(menuItem.when ?? "", /shelfy\.editMode/);
+    strict_1.default.match(menuItem.when ?? "", /\^project/);
+});
 (0, node_test_1.default)("store reorders projects and folders within their current level", async () => {
     const store = new store_1.ProjectStore(createStoreContext({
         [STORAGE_KEY]: {
@@ -310,6 +324,23 @@ function createStoreContext(initialState) {
         throw new Error("Expected project with scripts.");
     }
     strict_1.default.deepEqual(project.scripts?.map((script) => script.id), ["custom-dev", "package-test"]);
+});
+(0, node_test_1.default)("store updates project paths and keeps duplicate path protection", async () => {
+    const store = new store_1.ProjectStore(createStoreContext({
+        [STORAGE_KEY]: {
+            version: 2,
+            children: createTree()
+        }
+    }));
+    await store.updateProjectPath("root-tool", "C:\\projects\\root-tool-renamed");
+    const data = store.read();
+    const rootTool = data.children.find((node) => node.id === "root-tool");
+    strict_1.default.equal(rootTool?.kind, "project");
+    if (!rootTool || rootTool.kind !== "project") {
+        throw new Error("Expected root project.");
+    }
+    strict_1.default.equal(rootTool.projectPath, "C:\\projects\\root-tool-renamed");
+    await strict_1.default.rejects(() => store.updateProjectPath("root-tool", "C:\\projects\\web-app"), /already saved/);
 });
 (0, node_test_1.default)("store saves and clears personalization for folders and projects", async () => {
     const store = new store_1.ProjectStore(createStoreContext({

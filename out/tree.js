@@ -61,7 +61,7 @@ class GroupItem extends vscode.TreeItem {
 }
 exports.GroupItem = GroupItem;
 class ProjectItem extends vscode.TreeItem {
-    constructor(project, iconPath, projectColor, projectIcon, showPath = true, editMode = false, expandScripts = editMode, contextValue = "project") {
+    constructor(project, iconPath, projectColor, projectIcon, showPath = true, editMode = false, expandScripts = editMode, contextValue = "project", projectPathExists = true) {
         const scriptCount = project.scripts?.length ?? 0;
         super(project.name, scriptCount > 0
             ? expandScripts
@@ -71,13 +71,22 @@ class ProjectItem extends vscode.TreeItem {
         this.project = project;
         this.id = project.id;
         this.contextValue = contextValue;
-        this.description = showPath ? project.projectPath : undefined;
+        this.description = projectPathExists
+            ? showPath
+                ? project.projectPath
+                : undefined
+            : showPath
+                ? `Missing: ${project.projectPath}`
+                : "Missing path";
         const scriptSummary = scriptCount > 0 ? `\nScripts: ${scriptCount}` : "";
         const colorSummary = projectColor ? `\nColor: ${projectColor}` : "";
         const iconSummary = projectIcon ? `\nIcon: ${projectIcon}` : "";
-        this.tooltip = `${project.projectPath}${colorSummary}${iconSummary}${scriptSummary}`;
+        const pathSummary = projectPathExists
+            ? project.projectPath
+            : `Missing path\n${project.projectPath}`;
+        this.tooltip = `${pathSummary}${colorSummary}${iconSummary}${scriptSummary}`;
         const command = (0, treeBehavior_1.getProjectRowCommandDefinition)(editMode);
-        if (command) {
+        if (command && projectPathExists) {
             this.command = {
                 ...command,
                 arguments: [this]
@@ -217,10 +226,11 @@ class ShelfyProvider {
                 items.push(item);
             }
             else {
+                const projectPathExists = await isDirectory(node.projectPath);
                 const color = await this.resolveProjectDisplayColor(node);
-                const iconPath = await this.resolveProjectIconPath(node, color);
+                const iconPath = await this.resolveProjectIconPath(node, color, projectPathExists);
                 const showPath = (0, config_1.getShelfySetting)("showProjectPath", false);
-                items.push(new ProjectItem(node, iconPath, color, (0, personalization_1.formatPersonalizationIcon)(node.personalization?.icon), showPath, this.editMode, this.editMode || expandForFilter, getMoveContextValue("project", adjacentMoveTargets, (0, personalization_1.hasNodePersonalization)(node.personalization))));
+                items.push(new ProjectItem(node, iconPath, color, (0, personalization_1.formatPersonalizationIcon)(node.personalization?.icon), showPath, this.editMode, this.editMode || expandForFilter, getMoveContextValue("project", adjacentMoveTargets, (0, personalization_1.hasNodePersonalization)(node.personalization), projectPathExists ? [] : ["missingPath"]), projectPathExists));
             }
         }
         return items;
@@ -318,7 +328,10 @@ class ShelfyProvider {
     async resolveProjectDisplayColor(project) {
         return project.personalization?.color ?? this.ensureColor(project.projectPath);
     }
-    async resolveProjectIconPath(project, color) {
+    async resolveProjectIconPath(project, color, projectPathExists) {
+        if (!projectPathExists) {
+            return new vscode.ThemeIcon("warning", new vscode.ThemeColor("problemsWarningIcon.foreground"));
+        }
         const personalizedIcon = await getOrCreatePersonalizedIcon(this.context, project.personalization, color);
         if (personalizedIcon) {
             return personalizedIcon;
@@ -397,7 +410,7 @@ class ShelfyProvider {
     }
 }
 exports.ShelfyProvider = ShelfyProvider;
-function getMoveContextValue(kind, adjacentMoveTargets, hasPersonalization = false) {
+function getMoveContextValue(kind, adjacentMoveTargets, hasPersonalization = false, extraContextValues = []) {
     const contextValues = [kind];
     if (adjacentMoveTargets.up) {
         contextValues.push("canMoveUp");
@@ -408,6 +421,7 @@ function getMoveContextValue(kind, adjacentMoveTargets, hasPersonalization = fal
     if (hasPersonalization) {
         contextValues.push("hasPersonalization");
     }
+    contextValues.push(...extraContextValues);
     return contextValues.join(":");
 }
 function buildGroupTooltip(group) {
@@ -427,6 +441,15 @@ function collectProjects(nodes) {
         }
     }
     return result;
+}
+async function isDirectory(projectPath) {
+    try {
+        const stat = await fs.stat(projectPath);
+        return stat.isDirectory();
+    }
+    catch {
+        return false;
+    }
 }
 async function getOrCreateColorIcon(context, color) {
     const normalized = color.toLowerCase();
