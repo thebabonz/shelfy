@@ -88,12 +88,12 @@ class ProjectItem extends vscode.TreeItem {
 }
 exports.ProjectItem = ProjectItem;
 class ScriptItem extends vscode.TreeItem {
-    constructor(project, script, editMode) {
+    constructor(project, script, editMode, contextValue = "script") {
         super(script.kind === "package" ? script.scriptName : script.name, vscode.TreeItemCollapsibleState.None);
         this.project = project;
         this.script = script;
         this.id = script.id;
-        this.contextValue = "script";
+        this.contextValue = contextValue;
         this.description = script.kind === "package" ? "package.json" : script.command;
         this.tooltip =
             script.kind === "package"
@@ -226,7 +226,10 @@ class ShelfyProvider {
         return items;
     }
     toScriptItems(project) {
-        return (project.scripts ?? []).map((script) => new ScriptItem(project, script, this.editMode));
+        return (project.scripts ?? []).map((script) => {
+            const adjacentMoveTargets = (0, treeBehavior_1.getAdjacentScriptMoveTargets)(project.scripts, script.id);
+            return new ScriptItem(project, script, this.editMode, getMoveContextValue("script", adjacentMoveTargets));
+        });
     }
     sortNodes(nodes) {
         if (this.sortMode === "none") {

@@ -292,6 +292,10 @@ async function activate(context) {
         }
     })), ...registerShelfyCommand("shelfy.moveItemToFolder", requireTreeEditable(async (item) => {
         await moveItemToFolder(store, provider, item);
+    })), ...registerShelfyCommand("shelfy.moveItemUp", requireTreeEditable(async (item) => {
+        await moveItemAdjacent(store, provider, item, "up");
+    })), ...registerShelfyCommand("shelfy.moveItemDown", requireTreeEditable(async (item) => {
+        await moveItemAdjacent(store, provider, item, "down");
     })), ...registerShelfyCommand("shelfy.openProject", async (item) => {
         await openProjectInCurrentWindow(item);
     }), ...registerShelfyCommand("shelfy.openProjectInNewWindow", async (item) => {
@@ -473,6 +477,41 @@ async function moveItemToFolder(store, provider, item) {
         if (picked.targetGroupId) {
             await provider.markExpanded(picked.targetGroupId);
         }
+        provider.refresh();
+    }
+    catch (error) {
+        await vscode.window.showErrorMessage(asMessage(error));
+    }
+}
+async function moveItemAdjacent(store, provider, item, direction) {
+    if (item instanceof tree_1.ScriptItem) {
+        await moveProjectScriptAdjacent(store, provider, item, direction);
+        return;
+    }
+    if (!(item instanceof tree_1.GroupItem) && !(item instanceof tree_1.ProjectItem)) {
+        await vscode.window.showInformationMessage("Use Move Up or Move Down from a Shelfy project, folder, or script.");
+        return;
+    }
+    const nodeId = item instanceof tree_1.GroupItem ? item.group.id : item.project.id;
+    const target = (0, treeBehavior_1.getAdjacentMoveTargets)(store.read().children, nodeId)[direction];
+    if (!target) {
+        return;
+    }
+    try {
+        await store.moveNode(nodeId, target.parentGroupId, target.targetIndex);
+        provider.refresh();
+    }
+    catch (error) {
+        await vscode.window.showErrorMessage(asMessage(error));
+    }
+}
+async function moveProjectScriptAdjacent(store, provider, item, direction) {
+    const target = (0, treeBehavior_1.getAdjacentScriptMoveTargets)(item.project.scripts, item.script.id)[direction];
+    if (!target) {
+        return;
+    }
+    try {
+        await store.moveProjectScript(item.project.id, item.script.id, target.targetIndex);
         provider.refresh();
     }
     catch (error) {

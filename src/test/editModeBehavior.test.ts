@@ -8,6 +8,7 @@ import { ProjectStore } from "../store";
 import { filterTreeNodes, normalizeTreeFilterText } from "../treeFilter";
 import {
   getAdjacentMoveTargets,
+  getAdjacentScriptMoveTargets,
   getMoveDestinations,
   getShelfyTreeMimeTypes,
   getProjectRowCommandDefinition,
@@ -241,15 +242,45 @@ test("adjacent move targets stay within the current level", () => {
   });
 });
 
-test("manifest does not contribute move up or move down actions", () => {
+test("adjacent script move targets stay within the current command level", () => {
+  const project = createProjectWithScripts();
+
+  assert.deepEqual(getAdjacentScriptMoveTargets(project.scripts, "custom-dev"), {
+    up: undefined,
+    down: {
+      parentGroupId: undefined,
+      targetIndex: 1
+    }
+  });
+
+  assert.deepEqual(getAdjacentScriptMoveTargets(project.scripts, "package-test"), {
+    up: {
+      parentGroupId: undefined,
+      targetIndex: 0
+    },
+    down: undefined
+  });
+});
+
+test("manifest contributes move up and move down actions in edit mode", () => {
   const manifest = readManifest();
   const commands = manifest.contributes.commands;
   const menuItems = manifest.contributes.menus["view/item/context"];
+  const moveUpCommand = commands.find((command) => command.command === "shelfy.moveItemUp");
+  const moveDownCommand = commands.find((command) => command.command === "shelfy.moveItemDown");
+  const moveUpMenuItem = menuItems.find((item) => item.command === "shelfy.moveItemUp");
+  const moveDownMenuItem = menuItems.find((item) => item.command === "shelfy.moveItemDown");
 
-  assert.ok(!commands.some((command) => command.command === "shelfy.moveItemUp"));
-  assert.ok(!commands.some((command) => command.command === "shelfy.moveItemDown"));
-  assert.ok(!menuItems.some((item) => item.command === "shelfy.moveItemUp"));
-  assert.ok(!menuItems.some((item) => item.command === "shelfy.moveItemDown"));
+  assert.ok(moveUpCommand, "Expected command contribution for shelfy.moveItemUp");
+  assert.ok(moveDownCommand, "Expected command contribution for shelfy.moveItemDown");
+  assert.ok(moveUpMenuItem, "Expected to find menu contribution for shelfy.moveItemUp");
+  assert.ok(moveDownMenuItem, "Expected to find menu contribution for shelfy.moveItemDown");
+  assert.match(moveUpCommand.enablement ?? "", /canMoveUp/);
+  assert.match(moveDownCommand.enablement ?? "", /canMoveDown/);
+  assert.doesNotMatch(moveUpMenuItem.when ?? "", /canMoveUp/);
+  assert.doesNotMatch(moveDownMenuItem.when ?? "", /canMoveDown/);
+  assert.match(moveUpMenuItem.when ?? "", /shelfy\.editMode/);
+  assert.match(moveDownMenuItem.when ?? "", /shelfy\.editMode/);
   assert.ok(menuItems.some((item) => item.command === "shelfy.moveItemToFolder"));
 });
 
@@ -292,6 +323,37 @@ test("store reorders projects and folders within their current level", async () 
   }
 
   assert.deepEqual(frontend.children.map((node) => node.id), ["components", "web-app"]);
+});
+
+test("store reorders scripts within their project command level", async () => {
+  const store = new ProjectStore(createStoreContext({
+    [STORAGE_KEY]: {
+      version: 2,
+      children: [createProjectWithScripts()]
+    }
+  }));
+
+  await store.moveProjectScript("project-a", "custom-dev", 1);
+
+  let project = store.read().children[0];
+  assert.equal(project?.kind, "project");
+
+  if (!project || project.kind !== "project") {
+    throw new Error("Expected project with scripts.");
+  }
+
+  assert.deepEqual(project.scripts?.map((script) => script.id), ["package-test", "custom-dev"]);
+
+  await store.moveProjectScript("project-a", "custom-dev", 0);
+
+  project = store.read().children[0];
+  assert.equal(project?.kind, "project");
+
+  if (!project || project.kind !== "project") {
+    throw new Error("Expected project with scripts.");
+  }
+
+  assert.deepEqual(project.scripts?.map((script) => script.id), ["custom-dev", "package-test"]);
 });
 
 test("store saves and clears personalization for folders and projects", async () => {
@@ -436,7 +498,7 @@ test("manifest contributes edit script action only for script items in edit mode
   );
   assert.ok(menuItem, "Expected to find menu contribution for shelfy.editProjectScript");
   assert.match(menuItem.when ?? "", /shelfy\.editMode/);
-  assert.match(menuItem.when ?? "", /viewItem == script/);
+  assert.match(menuItem.when ?? "", /\^script/);
   assert.doesNotMatch(menuItem.when ?? "", /!shelfy\.editMode/);
 });
 

@@ -186,6 +186,22 @@ class ProjectStore {
         scripts.splice(index, 1);
         await this.write(data);
     }
+    async moveProjectScript(projectId, scriptId, targetIndex) {
+        const data = this.read();
+        const project = findProjectById(data.children, projectId);
+        if (!project) {
+            throw new Error("Project not found.");
+        }
+        const scripts = project.scripts ?? [];
+        const index = scripts.findIndex((script) => script.id === scriptId);
+        if (index < 0) {
+            throw new Error("Script not found.");
+        }
+        const [script] = scripts.splice(index, 1);
+        const clampedIndex = Math.max(0, Math.min(targetIndex, scripts.length));
+        scripts.splice(clampedIndex, 0, script);
+        await this.write(data);
+    }
     async removeNode(nodeId) {
         const data = this.read();
         const removed = removeNodeRecursive(data.children, nodeId);

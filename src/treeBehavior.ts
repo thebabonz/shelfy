@@ -1,4 +1,4 @@
-import { GroupNodeData, NodeData } from "./model";
+import { GroupNodeData, NodeData, ProjectScriptData } from "./model";
 
 export const SHELFY_TREE_MIME = "application/vnd.code.tree.shelfyView";
 
@@ -96,6 +96,38 @@ export function getAdjacentMoveTargets(
         ? {
             parentGroupId: source.parentGroupId,
             targetIndex: source.index + 1
+          }
+        : undefined
+  };
+}
+
+export function getAdjacentScriptMoveTargets(
+  scripts: readonly ProjectScriptData[] | undefined,
+  sourceScriptId: string
+): AdjacentMoveTargets {
+  const sourceIndex = scripts?.findIndex((script) => script.id === sourceScriptId) ?? -1;
+  const siblingCount = scripts?.length ?? 0;
+
+  if (sourceIndex < 0) {
+    return {
+      up: undefined,
+      down: undefined
+    };
+  }
+
+  return {
+    up:
+      sourceIndex > 0
+        ? {
+            parentGroupId: undefined,
+            targetIndex: sourceIndex - 1
+          }
+        : undefined,
+    down:
+      sourceIndex < siblingCount - 1
+        ? {
+            parentGroupId: undefined,
+            targetIndex: sourceIndex + 1
           }
         : undefined
   };

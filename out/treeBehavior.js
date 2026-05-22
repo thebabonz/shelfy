@@ -6,6 +6,7 @@ exports.getShelfyTreeMimeTypes = getShelfyTreeMimeTypes;
 exports.getProjectRowCommandDefinition = getProjectRowCommandDefinition;
 exports.getMoveDestinations = getMoveDestinations;
 exports.getAdjacentMoveTargets = getAdjacentMoveTargets;
+exports.getAdjacentScriptMoveTargets = getAdjacentScriptMoveTargets;
 exports.SHELFY_TREE_MIME = "application/vnd.code.tree.shelfyView";
 function isShelfyTreeEditable(editMode, hasFilter) {
     return editMode && !hasFilter;
@@ -60,6 +61,30 @@ function getAdjacentMoveTargets(nodes, sourceNodeId) {
             ? {
                 parentGroupId: source.parentGroupId,
                 targetIndex: source.index + 1
+            }
+            : undefined
+    };
+}
+function getAdjacentScriptMoveTargets(scripts, sourceScriptId) {
+    const sourceIndex = scripts?.findIndex((script) => script.id === sourceScriptId) ?? -1;
+    const siblingCount = scripts?.length ?? 0;
+    if (sourceIndex < 0) {
+        return {
+            up: undefined,
+            down: undefined
+        };
+    }
+    return {
+        up: sourceIndex > 0
+            ? {
+                parentGroupId: undefined,
+                targetIndex: sourceIndex - 1
+            }
+            : undefined,
+        down: sourceIndex < siblingCount - 1
+            ? {
+                parentGroupId: undefined,
+                targetIndex: sourceIndex + 1
             }
             : undefined
     };

@@ -18,6 +18,8 @@ import { PackageScriptOption, readPackageScripts, resolveProjectScriptCommand } 
 import { ProjectStore } from "./store";
 import { ShelfyProvider, GroupItem, ProjectItem, ScriptItem, SortMode } from "./tree";
 import {
+  getAdjacentMoveTargets,
+  getAdjacentScriptMoveTargets,
   getShelfyTreeMimeTypes,
   getMoveDestinations,
   isShelfyTreeEditable
@@ -371,6 +373,14 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       await moveItemToFolder(store, provider, item);
     })),
 
+    ...registerShelfyCommand("shelfy.moveItemUp", requireTreeEditable(async (item?: GroupItem | ProjectItem | ScriptItem) => {
+      await moveItemAdjacent(store, provider, item, "up");
+    })),
+
+    ...registerShelfyCommand("shelfy.moveItemDown", requireTreeEditable(async (item?: GroupItem | ProjectItem | ScriptItem) => {
+      await moveItemAdjacent(store, provider, item, "down");
+    })),
+
     ...registerShelfyCommand("shelfy.openProject", async (item: ProjectItem) => {
       await openProjectInCurrentWindow(item);
     }),
@@ -639,6 +649,57 @@ async function moveItemToFolder(
       await provider.markExpanded(picked.targetGroupId);
     }
 
+    provider.refresh();
+  } catch (error) {
+    await vscode.window.showErrorMessage(asMessage(error));
+  }
+}
+
+async function moveItemAdjacent(
+  store: ProjectStore,
+  provider: ShelfyProvider,
+  item: GroupItem | ProjectItem | ScriptItem | undefined,
+  direction: "up" | "down"
+): Promise<void> {
+  if (item instanceof ScriptItem) {
+    await moveProjectScriptAdjacent(store, provider, item, direction);
+    return;
+  }
+
+  if (!(item instanceof GroupItem) && !(item instanceof ProjectItem)) {
+    await vscode.window.showInformationMessage(
+      "Use Move Up or Move Down from a Shelfy project, folder, or script."
+    );
+    return;
+  }
+
+  const nodeId = item instanceof GroupItem ? item.group.id : item.project.id;
+  const target = getAdjacentMoveTargets(store.read().children, nodeId)[direction];
+  if (!target) {
+    return;
+  }
+
+  try {
+    await store.moveNode(nodeId, target.parentGroupId, target.targetIndex);
+    provider.refresh();
+  } catch (error) {
+    await vscode.window.showErrorMessage(asMessage(error));
+  }
+}
+
+async function moveProjectScriptAdjacent(
+  store: ProjectStore,
+  provider: ShelfyProvider,
+  item: ScriptItem,
+  direction: "up" | "down"
+): Promise<void> {
+  const target = getAdjacentScriptMoveTargets(item.project.scripts, item.script.id)[direction];
+  if (!target) {
+    return;
+  }
+
+  try {
+    await store.moveProjectScript(item.project.id, item.script.id, target.targetIndex);
     provider.refresh();
   } catch (error) {
     await vscode.window.showErrorMessage(asMessage(error));

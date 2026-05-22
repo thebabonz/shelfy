@@ -132,6 +132,18 @@
         "icon": "$(move)"
       },
       {
+        "command": "shelfy.moveItemUp",
+        "title": "Move Up",
+        "icon": "$(arrow-up)",
+        "enablement": "viewItem =~ /(^|:)canMoveUp(:|$)/ && shelfy.editMode"
+      },
+      {
+        "command": "shelfy.moveItemDown",
+        "title": "Move Down",
+        "icon": "$(arrow-down)",
+        "enablement": "viewItem =~ /(^|:)canMoveDown(:|$)/ && shelfy.editMode"
+      },
+      {
         "command": "shelfy.openProject",
         "title": "Open Project",
         "icon": {
@@ -367,38 +379,58 @@
           "group": "2_modification@1"
         },
         {
+          "command": "shelfy.moveItemUp",
+          "when": "view == shelfyView && (viewItem =~ /^group(?:$|:)/ || viewItem =~ /^project(?:$|:)/ || viewItem =~ /^script(?:$|:)/) && shelfy.editMode",
+          "group": "2_modification@2"
+        },
+        {
+          "command": "shelfy.moveItemDown",
+          "when": "view == shelfyView && (viewItem =~ /^group(?:$|:)/ || viewItem =~ /^project(?:$|:)/ || viewItem =~ /^script(?:$|:)/) && shelfy.editMode",
+          "group": "2_modification@3"
+        },
+        {
           "command": "shelfy.editItemPersonalization",
           "when": "view == shelfyView && (viewItem =~ /^group(?:$|:)/ || viewItem =~ /^project(?:$|:)/) && shelfy.editMode",
-          "group": "2_modification@2"
+          "group": "2_modification@4"
         },
         {
           "command": "shelfy.addProjectScript",
           "when": "view == shelfyView && viewItem =~ /^project(?:$|:)/ && shelfy.editMode",
-          "group": "2_modification@3"
+          "group": "2_modification@5"
         },
         {
           "command": "shelfy.renameProject",
           "when": "view == shelfyView && viewItem =~ /^project(?:$|:)/ && shelfy.editMode",
-          "group": "2_modification@4"
+          "group": "2_modification@6"
         },
         {
           "command": "shelfy.removeItem",
           "when": "view == shelfyView && (viewItem =~ /^group(?:$|:)/ || viewItem =~ /^project(?:$|:)/) && shelfy.editMode",
-          "group": "2_modification@5"
+          "group": "2_modification@7"
         },
         {
           "command": "shelfy.runProjectScript",
-          "when": "view == shelfyView && viewItem == script && !shelfy.editMode",
+          "when": "view == shelfyView && viewItem =~ /^script(?:$|:)/ && !shelfy.editMode",
           "group": "inline@1"
         },
         {
+          "command": "shelfy.moveItemUp",
+          "when": "view == shelfyView && viewItem =~ /^script(?:$|:)/ && shelfy.editMode",
+          "group": "inline@1"
+        },
+        {
+          "command": "shelfy.moveItemDown",
+          "when": "view == shelfyView && viewItem =~ /^script(?:$|:)/ && shelfy.editMode",
+          "group": "inline@2"
+        },
+        {
           "command": "shelfy.editProjectScript",
-          "when": "view == shelfyView && viewItem == script && shelfy.editMode",
+          "when": "view == shelfyView && viewItem =~ /^script(?:$|:)/ && shelfy.editMode",
           "group": "inline"
         },
         {
           "command": "shelfy.removeProjectScript",
-          "when": "view == shelfyView && viewItem == script && shelfy.editMode",
+          "when": "view == shelfyView && viewItem =~ /^script(?:$|:)/ && shelfy.editMode",
           "group": "inline"
         },
         {

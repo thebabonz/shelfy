@@ -219,14 +219,41 @@ function createStoreContext(initialState) {
         down: undefined
     });
 });
-(0, node_test_1.default)("manifest does not contribute move up or move down actions", () => {
+(0, node_test_1.default)("adjacent script move targets stay within the current command level", () => {
+    const project = createProjectWithScripts();
+    strict_1.default.deepEqual((0, treeBehavior_1.getAdjacentScriptMoveTargets)(project.scripts, "custom-dev"), {
+        up: undefined,
+        down: {
+            parentGroupId: undefined,
+            targetIndex: 1
+        }
+    });
+    strict_1.default.deepEqual((0, treeBehavior_1.getAdjacentScriptMoveTargets)(project.scripts, "package-test"), {
+        up: {
+            parentGroupId: undefined,
+            targetIndex: 0
+        },
+        down: undefined
+    });
+});
+(0, node_test_1.default)("manifest contributes move up and move down actions in edit mode", () => {
     const manifest = readManifest();
     const commands = manifest.contributes.commands;
     const menuItems = manifest.contributes.menus["view/item/context"];
-    strict_1.default.ok(!commands.some((command) => command.command === "shelfy.moveItemUp"));
-    strict_1.default.ok(!commands.some((command) => command.command === "shelfy.moveItemDown"));
-    strict_1.default.ok(!menuItems.some((item) => item.command === "shelfy.moveItemUp"));
-    strict_1.default.ok(!menuItems.some((item) => item.command === "shelfy.moveItemDown"));
+    const moveUpCommand = commands.find((command) => command.command === "shelfy.moveItemUp");
+    const moveDownCommand = commands.find((command) => command.command === "shelfy.moveItemDown");
+    const moveUpMenuItem = menuItems.find((item) => item.command === "shelfy.moveItemUp");
+    const moveDownMenuItem = menuItems.find((item) => item.command === "shelfy.moveItemDown");
+    strict_1.default.ok(moveUpCommand, "Expected command contribution for shelfy.moveItemUp");
+    strict_1.default.ok(moveDownCommand, "Expected command contribution for shelfy.moveItemDown");
+    strict_1.default.ok(moveUpMenuItem, "Expected to find menu contribution for shelfy.moveItemUp");
+    strict_1.default.ok(moveDownMenuItem, "Expected to find menu contribution for shelfy.moveItemDown");
+    strict_1.default.match(moveUpCommand.enablement ?? "", /canMoveUp/);
+    strict_1.default.match(moveDownCommand.enablement ?? "", /canMoveDown/);
+    strict_1.default.doesNotMatch(moveUpMenuItem.when ?? "", /canMoveUp/);
+    strict_1.default.doesNotMatch(moveDownMenuItem.when ?? "", /canMoveDown/);
+    strict_1.default.match(moveUpMenuItem.when ?? "", /shelfy\.editMode/);
+    strict_1.default.match(moveDownMenuItem.when ?? "", /shelfy\.editMode/);
     strict_1.default.ok(menuItems.some((item) => item.command === "shelfy.moveItemToFolder"));
 });
 (0, node_test_1.default)("manifest contributes personalization actions for projects and folders in edit mode", () => {
@@ -261,6 +288,28 @@ function createStoreContext(initialState) {
         throw new Error("Expected frontend group.");
     }
     strict_1.default.deepEqual(frontend.children.map((node) => node.id), ["components", "web-app"]);
+});
+(0, node_test_1.default)("store reorders scripts within their project command level", async () => {
+    const store = new store_1.ProjectStore(createStoreContext({
+        [STORAGE_KEY]: {
+            version: 2,
+            children: [createProjectWithScripts()]
+        }
+    }));
+    await store.moveProjectScript("project-a", "custom-dev", 1);
+    let project = store.read().children[0];
+    strict_1.default.equal(project?.kind, "project");
+    if (!project || project.kind !== "project") {
+        throw new Error("Expected project with scripts.");
+    }
+    strict_1.default.deepEqual(project.scripts?.map((script) => script.id), ["package-test", "custom-dev"]);
+    await store.moveProjectScript("project-a", "custom-dev", 0);
+    project = store.read().children[0];
+    strict_1.default.equal(project?.kind, "project");
+    if (!project || project.kind !== "project") {
+        throw new Error("Expected project with scripts.");
+    }
+    strict_1.default.deepEqual(project.scripts?.map((script) => script.id), ["custom-dev", "package-test"]);
 });
 (0, node_test_1.default)("store saves and clears personalization for folders and projects", async () => {
     const store = new store_1.ProjectStore(createStoreContext({
@@ -369,7 +418,7 @@ function createStoreContext(initialState) {
     strict_1.default.ok(manifest.contributes.commands.some((command) => command.command === "shelfy.editProjectScript"));
     strict_1.default.ok(menuItem, "Expected to find menu contribution for shelfy.editProjectScript");
     strict_1.default.match(menuItem.when ?? "", /shelfy\.editMode/);
-    strict_1.default.match(menuItem.when ?? "", /viewItem == script/);
+    strict_1.default.match(menuItem.when ?? "", /\^script/);
     strict_1.default.doesNotMatch(menuItem.when ?? "", /!shelfy\.editMode/);
 });
 (0, node_test_1.default)("manifest contributes filter actions in the view title", () => {

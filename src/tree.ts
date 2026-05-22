@@ -17,6 +17,7 @@ import { ProjectStore } from "./store";
 import {
   AdjacentMoveTargets,
   getAdjacentMoveTargets,
+  getAdjacentScriptMoveTargets,
   getShelfyTreeMimeTypes,
   getProjectRowCommandDefinition,
   SHELFY_TREE_MIME
@@ -100,7 +101,8 @@ export class ScriptItem extends vscode.TreeItem {
   constructor(
     public readonly project: ProjectNodeData,
     public readonly script: ProjectScriptData,
-    editMode: boolean
+    editMode: boolean,
+    contextValue = "script"
   ) {
     super(
       script.kind === "package" ? script.scriptName : script.name,
@@ -108,7 +110,7 @@ export class ScriptItem extends vscode.TreeItem {
     );
 
     this.id = script.id;
-    this.contextValue = "script";
+    this.contextValue = contextValue;
     this.description = script.kind === "package" ? "package.json" : script.command;
     this.tooltip =
       script.kind === "package"
@@ -312,7 +314,15 @@ export class ShelfyProvider
   }
 
   private toScriptItems(project: ProjectNodeData): ScriptItem[] {
-    return (project.scripts ?? []).map((script) => new ScriptItem(project, script, this.editMode));
+    return (project.scripts ?? []).map((script) => {
+      const adjacentMoveTargets = getAdjacentScriptMoveTargets(project.scripts, script.id);
+      return new ScriptItem(
+        project,
+        script,
+        this.editMode,
+        getMoveContextValue("script", adjacentMoveTargets)
+      );
+    });
   }
 
   private sortNodes(nodes: NodeData[]): NodeData[] {
@@ -551,7 +561,7 @@ export class ShelfyProvider
 }
 
 function getMoveContextValue(
-  kind: "group" | "project",
+  kind: "group" | "project" | "script",
   adjacentMoveTargets: AdjacentMoveTargets,
   hasPersonalization = false
 ): string {
