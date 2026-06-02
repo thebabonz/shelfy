@@ -34,6 +34,7 @@ var __importStar = (this && this.__importStar) || (function () {
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.ShelfyProvider = exports.ScriptItem = exports.ProjectItem = exports.GroupItem = void 0;
+exports.collectProjects = collectProjects;
 const vscode = __importStar(require("vscode"));
 const config_1 = require("./config");
 const personalization_1 = require("./personalization");

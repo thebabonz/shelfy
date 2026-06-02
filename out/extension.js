@@ -66,6 +66,30 @@ async function activate(context) {
     let treeEditable = false;
     let treeView;
     let treeViewDisposables = [];
+    const currentProjectStatusBar = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 100);
+    currentProjectStatusBar.name = "Shelfy Current Project";
+    currentProjectStatusBar.command = "shelfy.selectProjectInCurrentWindow";
+    const updateCurrentProjectStatusBar = () => {
+        const currentProject = getCurrentWorkspaceProject(store);
+        if (!currentProject) {
+            currentProjectStatusBar.hide();
+            return;
+        }
+        const iconLabel = (0, personalization_1.formatPersonalizationIcon)(currentProject.project.personalization?.icon);
+        const locationLabel = getProjectLocationLabel(currentProject.folderPath, currentProject.project.name);
+        currentProjectStatusBar.text = iconLabel
+            ? `$(folder-library) ${locationLabel} ${iconLabel}`
+            : `$(folder-library) ${locationLabel}`;
+        currentProjectStatusBar.tooltip = [
+            `Current Shelfy project: ${locationLabel}`,
+            currentProject.project.projectPath,
+            iconLabel ? `Icon: ${iconLabel}` : undefined,
+            "Select another saved project to open in this window"
+        ]
+            .filter((line) => Boolean(line))
+            .join("\n");
+        currentProjectStatusBar.show();
+    };
     const updateTreeViewState = () => {
         if (treeView) {
             treeView.message = provider.getFilterText()
@@ -141,6 +165,10 @@ async function activate(context) {
             }
         }
     });
+    context.subscriptions.push(currentProjectStatusBar);
+    context.subscriptions.push(provider.onDidChangeTreeData(() => updateCurrentProjectStatusBar()));
+    context.subscriptions.push(vscode.workspace.onDidChangeWorkspaceFolders(() => updateCurrentProjectStatusBar()));
+    updateCurrentProjectStatusBar();
     context.subscriptions.push(vscode.workspace.onDidChangeConfiguration(async (event) => {
         if ((0, config_1.affectsShelfySetting)(event, "clickAction")) {
             await setEffectiveClickActionContext();
@@ -303,6 +331,12 @@ async function activate(context) {
         await moveItemAdjacent(store, provider, item, "down");
     })), ...registerShelfyCommand("shelfy.openProject", async (item) => {
         await openProjectInCurrentWindow(item);
+    }), ...registerShelfyCommand("shelfy.selectProjectInCurrentWindow", async () => {
+        const picked = await pickSavedProjectInCurrentWindow(store);
+        if (!picked) {
+            return;
+        }
+        await openProjectInCurrentWindowByProject(picked);
     }), ...registerShelfyCommand("shelfy.openProjectInNewWindow", async (item) => {
         await openProjectInNewWindow(item);
     }), ...registerShelfyCommand("shelfy.openInExplorer", async (item) => {
@@ -356,31 +390,56 @@ async function openProjectFromRow(item) {
     if (action === "noAction") {
         return;
     }
-    if (!(await ensureProjectPathExists(item.project))) {
-        return;
-    }
-    await vscode.commands.executeCommand("vscode.openFolder", vscode.Uri.file(item.project.projectPath), {
-        forceNewWindow: action === "openNewInstance"
-    });
+    await openProject(item.project, action === "openNewInstance");
 }
 async function openProjectInCurrentWindow(item) {
-    if (!(await ensureProjectPathExists(item.project))) {
-        return;
-    }
-    await vscode.commands.executeCommand("vscode.openFolder", vscode.Uri.file(item.project.projectPath), {
-        forceNewWindow: false
-    });
+    await openProjectInCurrentWindowByProject(item.project);
 }
 async function openProjectInNewWindow(item) {
-    if (!(await ensureProjectPathExists(item.project))) {
+    await openProject(item.project, true);
+}
+async function openProjectInCurrentWindowByProject(project) {
+    await openProject(project, false);
+}
+async function openProject(project, forceNewWindow) {
+    if (!(await ensureProjectPathExists(project))) {
         return;
     }
-    await vscode.commands.executeCommand("vscode.openFolder", vscode.Uri.file(item.project.projectPath), {
-        forceNewWindow: true
+    await vscode.commands.executeCommand("vscode.openFolder", vscode.Uri.file(project.projectPath), {
+        forceNewWindow
     });
 }
 function getClickAction() {
     return (0, config_1.getShelfySetting)("clickAction", "openSameInstance");
+}
+async function pickSavedProjectInCurrentWindow(store) {
+    const nodes = store.read().children;
+    const projects = (0, tree_1.collectProjects)(nodes);
+    if (projects.length === 0) {
+        await vscode.window.showInformationMessage("No saved Shelfy projects are available to open.");
+        return undefined;
+    }
+    const currentProjectPath = getCurrentWorkspaceProject(store)?.project.projectPath;
+    const picked = await vscode.window.showQuickPick(projects.map((project) => {
+        const folderPath = getProjectFolderPath(nodes, project.id);
+        const iconLabel = (0, personalization_1.formatPersonalizationIcon)(project.personalization?.icon);
+        const detailParts = [project.projectPath, iconLabel];
+        if (currentProjectPath && (0, store_1.normalizeProjectPath)(project.projectPath) === (0, store_1.normalizeProjectPath)(currentProjectPath)) {
+            detailParts.push("Current window");
+        }
+        return {
+            label: project.name,
+            description: folderPath ?? "Root",
+            detail: detailParts.join(" • "),
+            project
+        };
+    }), {
+        title: "Open Saved Project in Current Window",
+        placeHolder: "Type to filter saved projects",
+        matchOnDescription: true,
+        matchOnDetail: true
+    });
+    return picked?.project;
 }
 function getItemLabel(item) {
     return item instanceof tree_1.GroupItem ? item.group.name : item.project.name;
@@ -396,6 +455,39 @@ async function setEffectiveClickActionContext() {
 }
 async function setFilterContext(provider) {
     await vscode.commands.executeCommand("setContext", "shelfy.hasFilter", provider.hasFilter());
+}
+function getCurrentWorkspaceProject(store) {
+    const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
+    if (!workspaceFolder) {
+        return undefined;
+    }
+    const nodes = store.read().children;
+    const project = (0, store_1.findProjectByPath)(nodes, (0, store_1.normalizeProjectPath)(workspaceFolder.uri.fsPath));
+    if (!project) {
+        return undefined;
+    }
+    return {
+        project,
+        folderPath: getProjectFolderPath(nodes, project.id)
+    };
+}
+function getProjectFolderPath(nodes, projectId, groupNames = []) {
+    for (const node of nodes) {
+        if (node.kind === "project") {
+            if (node.id === projectId) {
+                return groupNames.length > 0 ? groupNames.join(" / ") : undefined;
+            }
+            continue;
+        }
+        const nested = getProjectFolderPath(node.children, projectId, [...groupNames, node.name]);
+        if (nested !== undefined) {
+            return nested;
+        }
+    }
+    return undefined;
+}
+function getProjectLocationLabel(folderPath, projectName) {
+    return folderPath ? `${folderPath} / ${projectName}` : `Root / ${projectName}`;
 }
 async function createGroup(store, provider, parentGroupId) {
     const name = await vscode.window.showInputBox({

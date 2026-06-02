@@ -611,7 +611,7 @@ function buildGroupTooltip(group: GroupNodeData): string {
   return `${group.name}${colorSummary}${iconSummary}`;
 }
 
-function collectProjects(nodes: NodeData[]): ProjectNodeData[] {
+export function collectProjects(nodes: NodeData[]): ProjectNodeData[] {
   const result: ProjectNodeData[] = [];
 
   for (const node of nodes) {
