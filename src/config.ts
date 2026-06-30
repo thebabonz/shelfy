@@ -41,3 +41,9 @@ export function affectsShelfySetting(event: vscode.ConfigurationChangeEvent, key
     event.affectsConfiguration(`${LEGACY_CONFIGURATION_SECTION}.${key}`)
   );
 }
+
+export type StorageMode = "profile" | "global";
+
+export function getStorageMode(): StorageMode {
+  return getShelfySetting<StorageMode>("storageMode", "profile");
+}

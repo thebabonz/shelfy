@@ -6,6 +6,7 @@ Manage and organize project folders globally in Visual Studio Code — independe
 
 - 📁 Save project directories globally (not tied to any workspace)
 - 🗂 Organize projects into virtual groups and nested folders
+- 🌐 **Choose storage location**: profile-specific or globally shared across VS Code profiles
 - 🎨 Display project color based on:
 
 .vscode/settings.json → workbench.colorCustomizations → titleBar.activeBackground
@@ -68,11 +69,30 @@ Set `shelfy.clickAction` in VS Code settings:
 - `openSameInstance` (default): clicking a row opens in current window
 - `openNewInstance`: clicking a row opens in a new window
 
-Optional setting:
+Optional settings:
 
 - `shelfy.showProjectPath`: shows the folder path below the project name in the tree view
+- `shelfy.storageMode`: choose where to store Shelfy data:
+  - `profile` (default) — Store data per VS Code profile (isolated between profiles)
+  - `global` — Store data globally, shared across all VS Code profiles
 
 Legacy `globalProjects.*` settings are still supported for existing installs.
+
+---
+
+## 💾 Storage Modes
+
+### Profile Mode (Default)
+Data is stored per VS Code profile, meaning each profile has its own separate list of projects and settings. This is useful if you want different project lists for different workflows.
+
+### Global Mode
+Data is stored in VS Code's global storage directory, shared across all profiles. This is ideal if you want to maintain a single consistent project list across all your VS Code profiles and instances.
+
+**To switch between modes:**
+1. Open VS Code Settings (Cmd/Ctrl + ,)
+2. Search for `shelfy.storageMode`
+3. Select either `profile` or `global`
+4. Extension will automatically migrate your data to the new storage location
 
 ---
 

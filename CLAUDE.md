@@ -13,10 +13,19 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - **`npm run test`** — Run tests (requires compile first, runs tests in `out/test/`)
 - **`npm run package`** — Package the extension as a .vsix file using vsce
 
+## Storage Modes
+
+Shelfy supports two storage modes, configurable via the `shelfy.storageMode` setting:
+
+- **`profile` (default)** — Data is stored per VS Code profile, isolated from other profiles
+- **`global`** — Data is stored globally in VS Code's global storage, shared across all profiles
+
+When switching modes, the extension automatically migrates existing data to the new storage location.
+
 ## Architecture
 
 ### Entry Point & Command Registration
-- **[extension.ts](src/extension.ts)** — Main entry point. Registers all ~30 commands, initializes the tree view provider, and orchestrates the UI state (edit mode, sorting, filtering).
+- **[extension.ts](src/extension.ts)** — Main entry point. Registers all ~30 commands, initializes the tree view provider, and orchestrates the UI state (edit mode, sorting, filtering). Handles storage mode migration when settings change.
 
 ### Data Model
 - **[model.ts](src/model.ts)** — Defines immutable data structures:
@@ -29,8 +38,12 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ### Storage & State Management
 - **[store.ts](src/store.ts)** — `ProjectStore` class encapsulates all data persistence:
-  - Reads/writes from VS Code's global state (key: `shelfy.data.v2`, legacy key: `globalProjects.data.v2`)
+  - Supports two storage backends via `IDataStorage` interface:
+    - `ProfileDataStorage` — uses VS Code's profile-specific global state (keys: `shelfy.data.v2`, legacy key: `globalProjects.data.v2`)
+    - `GlobalDataStorage` — writes to `globalStorageUri/shelfy-data.json` for cross-profile sharing
+  - Maintains in-memory cache for performance (initialized via `store.initialize()`)
   - Provides methods for CRUD operations (add, rename, remove groups/projects/scripts)
+  - Handles data migration between storage modes via `migrateStorageIfNeeded()`
   - Handles import/export as JSON
   - Validates uniqueness of project paths
   - Contains utility functions for tree traversal (find by ID, parent lookup, etc.)
@@ -80,6 +93,17 @@ Tests are minimal. The only test file is:
 - **[test/editModeBehavior.test.ts](src/test/editModeBehavior.test.ts)** — Unit tests for edit mode constraints
 
 Run with `npm test` (requires prior `npm run compile`).
+
+### Testing Storage Mode Migration
+
+To test storage mode changes:
+1. Add some projects/groups in profile mode
+2. Open settings and change `shelfy.storageMode` to `global`
+3. Verify data appears in `~/.vscode/globalStorage/thebabonz.shelfy/shelfy-data.json`
+4. Switch to a different VS Code profile
+5. Verify the data is present in the new profile
+6. Switch back and change to `profile` mode
+7. Verify data is isolated per profile again
 
 ## Common Development Tasks
 

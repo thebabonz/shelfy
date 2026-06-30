@@ -2,7 +2,7 @@ import { parse, ParseError } from "jsonc-parser";
 import * as os from "os";
 import * as path from "path";
 import * as vscode from "vscode";
-import { affectsShelfySetting, getShelfySetting } from "./config";
+import { affectsShelfySetting, getShelfySetting, getStorageMode } from "./config";
 import {
   NewProjectScriptData,
   NodePersonalization,
@@ -39,6 +39,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   await vscode.workspace.fs.createDirectory(context.globalStorageUri);
 
   const store = new ProjectStore(context);
+  await store.initialize();
   const provider = new ShelfyProvider(context, store);
   await provider.initialize();
 
@@ -150,6 +151,11 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 
   context.subscriptions.push(
     vscode.workspace.onDidChangeConfiguration(async (event) => {
+      if (affectsShelfySetting(event, "storageMode")) {
+        await handleStorageModeChange(store, provider);
+        return;
+      }
+
       if (affectsShelfySetting(event, "clickAction")) {
         await setEffectiveClickActionContext();
       }
@@ -1007,4 +1013,16 @@ function asMessage(error: unknown): string {
 async function cycleSortMode(provider: ShelfyProvider, nextMode: SortMode): Promise<void> {
   await provider.setSortMode(nextMode);
   await vscode.commands.executeCommand("setContext", "shelfy.sortMode", nextMode);
+}
+
+async function handleStorageModeChange(store: ProjectStore, provider: ShelfyProvider): Promise<void> {
+  try {
+    await store.migrateStorageIfNeeded();
+    provider.refresh();
+    await vscode.window.showInformationMessage(
+      `Shelfy storage migrated to ${getStorageMode()} mode. Reload the extension to complete the migration.`
+    );
+  } catch (error) {
+    await vscode.window.showErrorMessage(`Failed to migrate storage: ${asMessage(error)}`);
+  }
 }

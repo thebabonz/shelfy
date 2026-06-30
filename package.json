@@ -411,6 +411,19 @@
     "configuration": {
       "title": "Shelfy",
       "properties": {
+        "shelfy.storageMode": {
+          "type": "string",
+          "enum": [
+            "profile",
+            "global"
+          ],
+          "default": "profile",
+          "markdownDescription": "Where to store Shelfy data: **profile** (isolated per VS Code profile) or **global** (shared across all profiles). Requires extension reload to apply.",
+          "enumDescriptions": [
+            "Store data per VS Code profile (data resets when switching profiles)",
+            "Store data globally (shared across all VS Code profiles)"
+          ]
+        },
         "shelfy.clickAction": {
           "type": "string",
           "enum": [
