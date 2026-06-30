@@ -24,6 +24,7 @@ or Peacock workspace color:
 - ⚡ Quick open projects directly from the sidebar
 - ▶️ Add, edit, and run project scripts from the sidebar
 - 💾 Import or export the full folders, projects, and scripts configuration as JSON
+- 📥 Import projects from the **Project Manager** extension (tags as folders)
 
 ---
 
@@ -86,6 +87,13 @@ The project keeps its display name, scripts, personalization, and position.
 
 - Use the Command Palette commands `Export Configuration` and `Import Configuration` to save or restore the full folders, projects, and scripts setup as JSON
 - Importing a JSON file replaces the current saved configuration
+
+### Import from Project Manager
+
+- Use the Command Palette command `Import from Project Manager` to import projects from the [Project Manager](https://marketplace.visualstudio.com/items?itemName=alefragnani.project-manager) extension
+- Tags become Shelfy folders; projects within each tag are placed inside the corresponding folder
+- Projects with no tags are added at the root level
+- Importing replaces the current saved configuration
 
 ### Configure click behavior
 
