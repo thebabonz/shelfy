@@ -219,6 +219,10 @@
         "title": "Shelfy: Import Configuration"
       },
       {
+        "command": "shelfy.importFromProjectManager",
+        "title": "Shelfy: Import from Project Manager"
+      },
+      {
         "command": "shelfy.cloneGroupWithNewBase",
         "title": "Clone with New Base Path",
         "icon": "$(copy)"

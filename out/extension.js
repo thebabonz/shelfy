@@ -36,6 +36,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.activate = activate;
 exports.deactivate = deactivate;
 const jsonc_parser_1 = require("jsonc-parser");
+const crypto = __importStar(require("crypto"));
 const os = __importStar(require("os"));
 const path = __importStar(require("path"));
 const vscode = __importStar(require("vscode"));
@@ -205,6 +206,8 @@ async function activate(context) {
         await exportConfiguration(store);
     }), ...registerShelfyCommand("shelfy.importConfiguration", async () => {
         await importConfiguration(store, provider);
+    }), ...registerShelfyCommand("shelfy.importFromProjectManager", async () => {
+        await importFromProjectManager(store, provider);
     }), ...registerShelfyCommand("shelfy.openSettings", async () => {
         await vscode.commands.executeCommand("workbench.action.openSettings", `@ext:${context.extension.id}`);
     }), ...registerShelfyCommand("shelfy.addRootGroup", requireTreeEditable(async () => {
@@ -700,6 +703,81 @@ async function importConfiguration(store, provider) {
     catch (error) {
         await vscode.window.showErrorMessage(asMessage(error));
     }
+}
+async function importFromProjectManager(store, provider) {
+    const target = await vscode.window.showOpenDialog({
+        canSelectFiles: true,
+        canSelectFolders: false,
+        canSelectMany: false,
+        filters: {
+            JSON: ["json"]
+        },
+        openLabel: "Import from Project Manager"
+    });
+    if (!target?.length) {
+        return;
+    }
+    const hasExistingItems = store.read().children.length > 0;
+    if (hasExistingItems) {
+        const answer = await vscode.window.showWarningMessage("Importing will replace the current folders, projects, and scripts configuration.", { modal: true }, "Import");
+        if (answer !== "Import") {
+            return;
+        }
+    }
+    try {
+        const raw = Buffer.from(await vscode.workspace.fs.readFile(target[0])).toString("utf8");
+        const parseErrors = [];
+        const parsed = (0, jsonc_parser_1.parse)(raw, parseErrors);
+        if (parseErrors.length > 0) {
+            throw new Error("The selected file is not valid JSON.");
+        }
+        if (!Array.isArray(parsed)) {
+            throw new Error("The selected file does not contain a valid Project Manager configuration.");
+        }
+        const entries = parsed;
+        const rootData = convertProjectManagerData(entries);
+        await store.write(rootData);
+        provider.refresh();
+        await vscode.window.showInformationMessage(`Project Manager configuration imported from "${target[0].fsPath}".`);
+    }
+    catch (error) {
+        await vscode.window.showErrorMessage(asMessage(error));
+    }
+}
+function convertProjectManagerData(entries) {
+    const tagMap = new Map();
+    for (const entry of entries) {
+        const project = {
+            kind: "project",
+            id: crypto.randomUUID(),
+            name: entry.name,
+            projectPath: (0, store_1.normalizeProjectPath)(entry.rootPath),
+            scripts: []
+        };
+        if (!entry.tags || entry.tags.length === 0) {
+            tagMap.set("", [...(tagMap.get("") ?? []), project]);
+        }
+        else {
+            for (const tag of entry.tags) {
+                tagMap.set(tag, [...(tagMap.get(tag) ?? []), { ...project, id: crypto.randomUUID() }]);
+            }
+        }
+    }
+    const children = [];
+    for (const [tag, projects] of tagMap) {
+        if (tag === "") {
+            children.push(...projects);
+        }
+        else {
+            children.push({
+                kind: "group",
+                id: crypto.randomUUID(),
+                name: tag,
+                children: projects
+            });
+        }
+    }
+    return { version: 2, children };
 }
 async function addProjectScript(store, provider, item) {
     const packageScripts = await getAvailablePackageScripts(item.project);
