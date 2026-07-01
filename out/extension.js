@@ -398,6 +398,17 @@ async function openProjectFromRow(item) {
     if (action === "noAction") {
         return;
     }
+    const confirmOnClick = (0, config_1.getShelfySetting)("confirmOnClick", false);
+    if (confirmOnClick) {
+        const projectName = item.project.name;
+        const actionLabel = action === "openNewInstance"
+            ? `Open '${projectName}' in a new window?`
+            : `Open '${projectName}' in this window?`;
+        const confirmed = await vscode.window.showInformationMessage(actionLabel, { modal: true }, "Open");
+        if (confirmed !== "Open") {
+            return;
+        }
+    }
     await openProject(item.project, action === "openNewInstance");
 }
 async function openProjectInCurrentWindow(item) {

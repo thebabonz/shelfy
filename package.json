@@ -488,6 +488,11 @@
           "default": "openSameInstance",
           "markdownDescription": "Action for click on a project row."
         },
+        "shelfy.confirmOnClick": {
+          "type": "boolean",
+          "default": false,
+          "description": "Show a confirmation dialog before opening a project on click."
+        },
         "shelfy.showProjectPath": {
           "type": "boolean",
           "default": false,

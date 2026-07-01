@@ -535,6 +535,19 @@ async function openProjectFromRow(item: ProjectItem): Promise<void> {
     return;
   }
 
+  const confirmOnClick = getShelfySetting<boolean>("confirmOnClick", false);
+  if (confirmOnClick) {
+    const projectName = item.project.name;
+    const actionLabel =
+      action === "openNewInstance"
+        ? `Open '${projectName}' in a new window?`
+        : `Open '${projectName}' in this window?`;
+    const confirmed = await vscode.window.showInformationMessage(actionLabel, { modal: true }, "Open");
+    if (confirmed !== "Open") {
+      return;
+    }
+  }
+
   await openProject(item.project, action === "openNewInstance");
 }
 

@@ -8,6 +8,8 @@ Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how 
 
 ### Added
 
+- **Confirm on Click** (`shelfy.confirmOnClick` setting): optionally show a confirmation dialog before opening a project on row click. The message reflects the configured `shelfy.clickAction` (e.g. _"Open in this window?"_ or _"Open in a new window?"_).
+
 - **Storage Mode Configuration** (`shelfy.storageMode` setting):
   - `profile` (default) — Store data per VS Code profile (isolated between profiles)
   - `global` — Store data globally in VS Code's global storage (shared across all profiles)

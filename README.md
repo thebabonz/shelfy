@@ -106,6 +106,9 @@ Set `shelfy.clickAction` in VS Code settings:
 
 Optional settings:
 
+- `shelfy.confirmOnClick`: show a confirmation dialog before opening a project on click. The message reflects the configured action:
+  - With `openSameInstance`: _"Open 'ProjectName' in this window?"_
+  - With `openNewInstance`: _"Open 'ProjectName' in a new window?"_
 - `shelfy.showProjectPath`: shows the folder path below the project name in the tree view
 - `shelfy.storageMode`: choose where to store Shelfy data:
   - `profile` (default) — Store data per VS Code profile (isolated between profiles)
