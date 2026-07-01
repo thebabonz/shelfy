@@ -27,7 +27,7 @@ function readManifest(): {
       enablement?: string;
     }>;
     configuration: {
-      properties: Record<string, { deprecationMessage?: string }>;
+      properties: Record<string, { type?: string; deprecationMessage?: string }>;
     };
     menus: {
       "view/title": Array<{ command: string; when?: string; group?: string; order?: number }>;
@@ -649,6 +649,8 @@ test("manifest contributes shelfy settings and deprecates legacy aliases", () =>
 
   assert.ok(properties["shelfy.clickAction"]);
   assert.ok(properties["shelfy.showProjectPath"]);
+  assert.ok(properties["shelfy.confirmOnClick"]);
+  assert.strictEqual(properties["shelfy.confirmOnClick"].type, "boolean");
   assert.match(properties["globalProjects.clickAction"]?.deprecationMessage ?? "", /shelfy\.clickAction/);
   assert.match(
     properties["globalProjects.showProjectPath"]?.deprecationMessage ?? "",

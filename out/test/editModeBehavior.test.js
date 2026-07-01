@@ -534,6 +534,8 @@ function createStoreContext(initialState) {
     const properties = readManifest().contributes.configuration.properties;
     strict_1.default.ok(properties["shelfy.clickAction"]);
     strict_1.default.ok(properties["shelfy.showProjectPath"]);
+    strict_1.default.ok(properties["shelfy.confirmOnClick"]);
+    strict_1.default.strictEqual(properties["shelfy.confirmOnClick"].type, "boolean");
     strict_1.default.match(properties["globalProjects.clickAction"]?.deprecationMessage ?? "", /shelfy\.clickAction/);
     strict_1.default.match(properties["globalProjects.showProjectPath"]?.deprecationMessage ?? "", /shelfy\.showProjectPath/);
 });
