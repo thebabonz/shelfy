@@ -40,16 +40,19 @@ exports.findProjectByPath = findProjectByPath;
 exports.findCommonBasePath = findCommonBasePath;
 const crypto = __importStar(require("crypto"));
 const path = __importStar(require("path"));
+const fs = __importStar(require("fs/promises"));
 const personalization_1 = require("./personalization");
 const projectColor_1 = require("./projectColor");
 const projectScriptState_1 = require("./projectScriptState");
+const config_1 = require("./config");
 const STORAGE_KEY = "shelfy.data.v2";
 const LEGACY_STORAGE_KEY = "globalProjects.data.v2";
-class ProjectStore {
+const GLOBAL_STORAGE_FILE = "shelfy-data.json";
+class ProfileDataStorage {
     constructor(context) {
         this.context = context;
     }
-    read() {
+    async read() {
         const stored = this.context.globalState.get(STORAGE_KEY);
         const legacy = this.context.globalState.get(LEGACY_STORAGE_KEY);
         if (isEmptyRootData(stored) && hasRootChildren(legacy)) {
@@ -61,6 +64,59 @@ class ProjectStore {
             children: []
         });
     }
+    async write(data) {
+        await this.context.globalState.update(STORAGE_KEY, data);
+        await this.context.globalState.update(LEGACY_STORAGE_KEY, undefined);
+    }
+}
+class GlobalDataStorage {
+    constructor(context) {
+        this.context = context;
+    }
+    getDataFilePath() {
+        return path.join(this.context.globalStorageUri.fsPath, GLOBAL_STORAGE_FILE);
+    }
+    async read() {
+        try {
+            const filePath = this.getDataFilePath();
+            const content = await fs.readFile(filePath, "utf-8");
+            const data = JSON.parse(content);
+            return data;
+        }
+        catch (error) {
+            if (error instanceof Error && "code" in error && error.code === "ENOENT") {
+                return {
+                    version: 2,
+                    children: []
+                };
+            }
+            throw error;
+        }
+    }
+    async write(data) {
+        const filePath = this.getDataFilePath();
+        const content = JSON.stringify(data, null, 2);
+        await fs.writeFile(filePath, content, "utf-8");
+    }
+}
+class ProjectStore {
+    constructor(context) {
+        this.context = context;
+        this.currentMode = (0, config_1.getStorageMode)();
+        this.storage = this.createStorage(this.currentMode);
+    }
+    createStorage(mode) {
+        return mode === "global" ? new GlobalDataStorage(this.context) : new ProfileDataStorage(this.context);
+    }
+    async initialize() {
+        this.cachedData = await this.storage.read();
+    }
+    read() {
+        if (!this.cachedData) {
+            throw new Error("ProjectStore not initialized. Call initialize() first.");
+        }
+        return this.cachedData;
+    }
     exportData() {
         return structuredClone(this.read());
     }
@@ -70,8 +126,18 @@ class ProjectStore {
         return normalized;
     }
     async write(data) {
-        await this.context.globalState.update(STORAGE_KEY, data);
-        await this.context.globalState.update(LEGACY_STORAGE_KEY, undefined);
+        this.cachedData = data;
+        await this.storage.write(data);
+    }
+    async migrateStorageIfNeeded() {
+        const nextMode = (0, config_1.getStorageMode)();
+        if (nextMode === this.currentMode) {
+            return;
+        }
+        const data = this.read();
+        this.currentMode = nextMode;
+        this.storage = this.createStorage(nextMode);
+        await this.write(data);
     }
     getParentGroupId(nodeId) {
         const result = findParentGroupIdForNode(this.read().children, nodeId);

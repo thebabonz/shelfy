@@ -36,6 +36,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.LEGACY_CONFIGURATION_SECTION = exports.SHELFY_CONFIGURATION_SECTION = void 0;
 exports.getShelfySetting = getShelfySetting;
 exports.affectsShelfySetting = affectsShelfySetting;
+exports.getStorageMode = getStorageMode;
 const vscode = __importStar(require("vscode"));
 exports.SHELFY_CONFIGURATION_SECTION = "shelfy";
 exports.LEGACY_CONFIGURATION_SECTION = "globalProjects";
@@ -60,5 +61,8 @@ function getShelfySetting(key, defaultValue) {
 function affectsShelfySetting(event, key) {
     return (event.affectsConfiguration(`${exports.SHELFY_CONFIGURATION_SECTION}.${key}`) ||
         event.affectsConfiguration(`${exports.LEGACY_CONFIGURATION_SECTION}.${key}`));
+}
+function getStorageMode() {
+    return getShelfySetting("storageMode", "profile");
 }
 //# sourceMappingURL=config.js.map

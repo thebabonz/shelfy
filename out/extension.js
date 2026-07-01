@@ -57,6 +57,7 @@ function registerShelfyCommand(command, callback) {
 async function activate(context) {
     await vscode.workspace.fs.createDirectory(context.globalStorageUri);
     const store = new store_1.ProjectStore(context);
+    await store.initialize();
     const provider = new tree_1.ShelfyProvider(context, store);
     await provider.initialize();
     await vscode.commands.executeCommand("setContext", "shelfy.editMode", false);
@@ -171,6 +172,10 @@ async function activate(context) {
     context.subscriptions.push(vscode.workspace.onDidChangeWorkspaceFolders(() => updateCurrentProjectStatusBar()));
     updateCurrentProjectStatusBar();
     context.subscriptions.push(vscode.workspace.onDidChangeConfiguration(async (event) => {
+        if ((0, config_1.affectsShelfySetting)(event, "storageMode")) {
+            await handleStorageModeChange(store, provider);
+            return;
+        }
         if ((0, config_1.affectsShelfySetting)(event, "clickAction")) {
             await setEffectiveClickActionContext();
         }
@@ -997,5 +1002,15 @@ async function ensureProjectPathExists(project) {
 async function cycleSortMode(provider, nextMode) {
     await provider.setSortMode(nextMode);
     await vscode.commands.executeCommand("setContext", "shelfy.sortMode", nextMode);
+}
+async function handleStorageModeChange(store, provider) {
+    try {
+        await store.migrateStorageIfNeeded();
+        provider.refresh();
+        await vscode.window.showInformationMessage(`Shelfy storage migrated to ${(0, config_1.getStorageMode)()} mode. Reload the extension to complete the migration.`);
+    }
+    catch (error) {
+        await vscode.window.showErrorMessage(`Failed to migrate storage: ${asMessage(error)}`);
+    }
 }
 //# sourceMappingURL=extension.js.map

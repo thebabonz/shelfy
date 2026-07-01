@@ -1,6 +1,7 @@
 import * as crypto from "crypto";
 import * as path from "path";
 import * as vscode from "vscode";
+import * as fs from "fs/promises";
 import {
   GroupNodeData,
   NewProjectScriptData,
@@ -16,14 +17,21 @@ import {
 } from "./personalization";
 import { isColorValue } from "./projectColor";
 import { addProjectScriptsToProject, updateProjectScriptInProject } from "./projectScriptState";
+import { StorageMode, getStorageMode } from "./config";
 
 const STORAGE_KEY = "shelfy.data.v2";
 const LEGACY_STORAGE_KEY = "globalProjects.data.v2";
+const GLOBAL_STORAGE_FILE = "shelfy-data.json";
 
-export class ProjectStore {
+interface IDataStorage {
+  read(): Promise<RootData>;
+  write(data: RootData): Promise<void>;
+}
+
+class ProfileDataStorage implements IDataStorage {
   constructor(private readonly context: vscode.ExtensionContext) {}
 
-  read(): RootData {
+  async read(): Promise<RootData> {
     const stored = this.context.globalState.get<RootData>(STORAGE_KEY);
     const legacy = this.context.globalState.get<RootData>(LEGACY_STORAGE_KEY);
 
@@ -40,6 +48,68 @@ export class ProjectStore {
     );
   }
 
+  async write(data: RootData): Promise<void> {
+    await this.context.globalState.update(STORAGE_KEY, data);
+    await this.context.globalState.update(LEGACY_STORAGE_KEY, undefined);
+  }
+}
+
+class GlobalDataStorage implements IDataStorage {
+  constructor(private readonly context: vscode.ExtensionContext) {}
+
+  private getDataFilePath(): string {
+    return path.join(this.context.globalStorageUri.fsPath, GLOBAL_STORAGE_FILE);
+  }
+
+  async read(): Promise<RootData> {
+    try {
+      const filePath = this.getDataFilePath();
+      const content = await fs.readFile(filePath, "utf-8");
+      const data = JSON.parse(content) as RootData;
+      return data;
+    } catch (error) {
+      if (error instanceof Error && "code" in error && error.code === "ENOENT") {
+        return {
+          version: 2,
+          children: []
+        };
+      }
+      throw error;
+    }
+  }
+
+  async write(data: RootData): Promise<void> {
+    const filePath = this.getDataFilePath();
+    const content = JSON.stringify(data, null, 2);
+    await fs.writeFile(filePath, content, "utf-8");
+  }
+}
+
+export class ProjectStore {
+  private storage: IDataStorage;
+  private currentMode: StorageMode;
+  private cachedData: RootData | undefined;
+
+  constructor(private readonly context: vscode.ExtensionContext) {
+    this.currentMode = getStorageMode();
+    this.storage = this.createStorage(this.currentMode);
+  }
+
+  private createStorage(mode: StorageMode): IDataStorage {
+    return mode === "global" ? new GlobalDataStorage(this.context) : new ProfileDataStorage(this.context);
+  }
+
+  async initialize(): Promise<void> {
+    this.cachedData = await this.storage.read();
+  }
+
+  read(): RootData {
+    if (!this.cachedData) {
+      throw new Error("ProjectStore not initialized. Call initialize() first.");
+    }
+    return this.cachedData;
+  }
+
   exportData(): RootData {
     return structuredClone(this.read());
   }
@@ -51,8 +121,20 @@ export class ProjectStore {
   }
 
   async write(data: RootData): Promise<void> {
-    await this.context.globalState.update(STORAGE_KEY, data);
-    await this.context.globalState.update(LEGACY_STORAGE_KEY, undefined);
+    this.cachedData = data;
+    await this.storage.write(data);
+  }
+
+  async migrateStorageIfNeeded(): Promise<void> {
+    const nextMode = getStorageMode();
+    if (nextMode === this.currentMode) {
+      return;
+    }
+
+    const data = this.read();
+    this.currentMode = nextMode;
+    this.storage = this.createStorage(nextMode);
+    await this.write(data);
   }
 
   getParentGroupId(nodeId: string): string | undefined {
