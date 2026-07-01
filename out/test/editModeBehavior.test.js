@@ -292,6 +292,7 @@ function createStoreContext(initialState) {
             children: createTree()
         }
     }));
+    await store.initialize();
     await store.moveNode("web-app", "frontend", 1);
     await store.moveNode("backend", undefined, 0);
     const data = store.read();
@@ -310,6 +311,7 @@ function createStoreContext(initialState) {
             children: [createProjectWithScripts()]
         }
     }));
+    await store.initialize();
     await store.moveProjectScript("project-a", "custom-dev", 1);
     let project = store.read().children[0];
     strict_1.default.equal(project?.kind, "project");
@@ -332,6 +334,7 @@ function createStoreContext(initialState) {
             children: createTree()
         }
     }));
+    await store.initialize();
     await store.updateProjectPath("root-tool", "C:\\projects\\root-tool-renamed");
     const data = store.read();
     const rootTool = data.children.find((node) => node.id === "root-tool");
@@ -349,6 +352,7 @@ function createStoreContext(initialState) {
             children: createTree()
         }
     }));
+    await store.initialize();
     await store.setNodePersonalization("frontend", {
         color: "#123456",
         icon: "folder"
@@ -533,7 +537,7 @@ function createStoreContext(initialState) {
     strict_1.default.match(properties["globalProjects.clickAction"]?.deprecationMessage ?? "", /shelfy\.clickAction/);
     strict_1.default.match(properties["globalProjects.showProjectPath"]?.deprecationMessage ?? "", /shelfy\.showProjectPath/);
 });
-(0, node_test_1.default)("store falls back to legacy data when v2 storage only contains the empty root", () => {
+(0, node_test_1.default)("store falls back to legacy data when v2 storage only contains the empty root", async () => {
     const legacyData = {
         version: 2,
         children: [
@@ -549,6 +553,7 @@ function createStoreContext(initialState) {
         [STORAGE_KEY]: { version: 2, children: [] },
         [LEGACY_STORAGE_KEY]: legacyData
     }));
+    await store.initialize();
     strict_1.default.deepEqual(store.read(), legacyData);
 });
 (0, node_test_1.default)("writing v2 data clears legacy storage so empty trees stay empty", async () => {

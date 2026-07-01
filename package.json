@@ -516,7 +516,7 @@
   "scripts": {
     "compile": "tsc -p ./",
     "watch": "tsc -watch -p ./",
-    "test": "npm run compile && node --test out/test/editModeBehavior.test.js",
+    "test": "npm run compile && node --require ./out/test/vscode-mock.js --test out/test/editModeBehavior.test.js",
     "package": "vsce package"
   },
   "devDependencies": {

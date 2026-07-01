@@ -329,6 +329,7 @@ test("store reorders projects and folders within their current level", async () 
     }
   }));
 
+  await store.initialize();
   await store.moveNode("web-app", "frontend", 1);
   await store.moveNode("backend", undefined, 0);
 
@@ -353,6 +354,7 @@ test("store reorders scripts within their project command level", async () => {
     }
   }));
 
+  await store.initialize();
   await store.moveProjectScript("project-a", "custom-dev", 1);
 
   let project = store.read().children[0];
@@ -384,6 +386,7 @@ test("store updates project paths and keeps duplicate path protection", async ()
     }
   }));
 
+  await store.initialize();
   await store.updateProjectPath("root-tool", "C:\\projects\\root-tool-renamed");
 
   const data = store.read();
@@ -411,6 +414,7 @@ test("store saves and clears personalization for folders and projects", async ()
     }
   }));
 
+  await store.initialize();
   await store.setNodePersonalization("frontend", {
     color: "#123456",
     icon: "folder"
@@ -652,7 +656,7 @@ test("manifest contributes shelfy settings and deprecates legacy aliases", () =>
   );
 });
 
-test("store falls back to legacy data when v2 storage only contains the empty root", () => {
+test("store falls back to legacy data when v2 storage only contains the empty root", async () => {
   const legacyData: RootData = {
     version: 2,
     children: [
@@ -672,6 +676,7 @@ test("store falls back to legacy data when v2 storage only contains the empty ro
     })
   );
 
+  await store.initialize();
   assert.deepEqual(store.read(), legacyData);
 });
 
