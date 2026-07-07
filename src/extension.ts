@@ -48,6 +48,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   await store.initialize();
   const provider = new ShelfyProvider(context, store);
   await provider.initialize();
+  await vscode.commands.executeCommand("setContext", "shelfy.initialized", true);
 
   await vscode.commands.executeCommand("setContext", "shelfy.editMode", false);
   await vscode.commands.executeCommand("setContext", "shelfy.sortMode", provider.getSortMode());
@@ -440,7 +441,17 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     })),
 
     ...registerShelfyCommand("shelfy.openProject", async (item: ProjectItem) => {
-      await openProjectInCurrentWindow(item);
+      const pick = await vscode.window.showQuickPick(
+        [
+          { label: "$(folder-opened) Open in this window", newWindow: false },
+          { label: "$(multiple-windows) Open in a new window", newWindow: true }
+        ],
+        { placeHolder: `Open '${item.project.name}'` }
+      );
+      if (!pick) {
+        return;
+      }
+      await openProject(item.project, pick.newWindow);
     }),
 
     ...registerShelfyCommand("shelfy.selectProjectInCurrentWindow", async () => {
@@ -470,6 +481,51 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
           return;
         }
         await vscode.commands.executeCommand("revealFileInOS", vscode.Uri.file(firstExisting.projectPath));
+      }
+    }),
+
+    ...registerShelfyCommand("shelfy.openGroup", async (item: GroupItem) => {
+      const projects = collectProjects(item.group.children);
+      if (projects.length === 0) {
+        await vscode.window.showInformationMessage("This group contains no projects.");
+        return;
+      }
+
+      const existing = await filterExistingProjects(projects);
+      if (existing.length === 0) {
+        await vscode.window.showInformationMessage("No reachable project folders found in this group.");
+        return;
+      }
+
+      const pick = await vscode.window.showQuickPick(
+        [
+          { label: "$(folder-opened) Open in this window", newWindow: false },
+          { label: "$(multiple-windows) Open in a new window", newWindow: true }
+        ],
+        { placeHolder: `Open '${item.group.name}'` }
+      );
+      if (!pick) {
+        return;
+      }
+
+      if (pick.newWindow) {
+        await openProject(existing[0], true);
+      } else {
+        const currentFsPaths = new Set(
+          (vscode.workspace.workspaceFolders ?? []).map((f) => f.uri.fsPath)
+        );
+        const toAdd = existing
+          .filter((p) => !currentFsPaths.has(p.projectPath))
+          .map((p) => ({ uri: vscode.Uri.file(p.projectPath) }));
+
+        if (toAdd.length > 0) {
+          vscode.workspace.updateWorkspaceFolders(
+            vscode.workspace.workspaceFolders?.length ?? 0,
+            0,
+            ...toAdd
+          );
+        }
+        await vscode.commands.executeCommand("workbench.view.explorer");
       }
     }),
 

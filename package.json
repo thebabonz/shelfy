@@ -231,6 +231,14 @@
         "title": "Shelfy: Import from Project Manager"
       },
       {
+        "command": "shelfy.openGroup",
+        "title": "Open Folder",
+        "icon": {
+          "light": "media/light/open-project.svg",
+          "dark": "media/dark/open-project.svg"
+        }
+      },
+      {
         "command": "shelfy.cloneGroupWithNewBase",
         "title": "Clone with New Base Path",
         "icon": "$(copy)"
@@ -268,6 +276,18 @@
           "light": "media/light/sort-desc.svg",
           "dark": "media/dark/sort-desc.svg"
         }
+      }
+    ],
+    "viewsWelcome": [
+      {
+        "view": "shelfyView",
+        "contents": "Loading...",
+        "when": "!shelfy.initialized"
+      },
+      {
+        "view": "shelfyView",
+        "contents": "No saved projects yet.\n[Add a project](command:shelfy.addProject)",
+        "when": "shelfy.initialized"
       }
     ],
     "menus": {
@@ -349,9 +369,9 @@
           "group": "inline@2"
         },
         {
-          "command": "shelfy.revealInVSCodeExplorer",
-          "when": "view == shelfyView && viewItem =~ /^group(?:$|:)/ && !shelfy.editMode && config.shelfy.showRevealInVSCodeExplorer",
-          "group": "inline@3"
+          "command": "shelfy.openGroup",
+          "when": "view == shelfyView && viewItem =~ /^group(?:$|:)/ && !shelfy.editMode",
+          "group": "inline@1"
         },
         {
           "command": "shelfy.openInExplorer",

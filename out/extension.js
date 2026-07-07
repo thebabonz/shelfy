@@ -60,6 +60,7 @@ async function activate(context) {
     await store.initialize();
     const provider = new tree_1.ShelfyProvider(context, store);
     await provider.initialize();
+    await vscode.commands.executeCommand("setContext", "shelfy.initialized", true);
     await vscode.commands.executeCommand("setContext", "shelfy.editMode", false);
     await vscode.commands.executeCommand("setContext", "shelfy.sortMode", provider.getSortMode());
     await setEffectiveClickActionContext();
@@ -338,7 +339,14 @@ async function activate(context) {
     })), ...registerShelfyCommand("shelfy.moveItemDown", requireTreeEditable(async (item) => {
         await moveItemAdjacent(store, provider, item, "down");
     })), ...registerShelfyCommand("shelfy.openProject", async (item) => {
-        await openProjectInCurrentWindow(item);
+        const pick = await vscode.window.showQuickPick([
+            { label: "$(folder-opened) Open in this window", newWindow: false },
+            { label: "$(multiple-windows) Open in a new window", newWindow: true }
+        ], { placeHolder: `Open '${item.project.name}'` });
+        if (!pick) {
+            return;
+        }
+        await openProject(item.project, pick.newWindow);
     }), ...registerShelfyCommand("shelfy.selectProjectInCurrentWindow", async () => {
         const picked = await pickSavedProjectInCurrentWindow(store);
         if (!picked) {
@@ -362,6 +370,37 @@ async function activate(context) {
                 return;
             }
             await vscode.commands.executeCommand("revealFileInOS", vscode.Uri.file(firstExisting.projectPath));
+        }
+    }), ...registerShelfyCommand("shelfy.openGroup", async (item) => {
+        const projects = (0, tree_1.collectProjects)(item.group.children);
+        if (projects.length === 0) {
+            await vscode.window.showInformationMessage("This group contains no projects.");
+            return;
+        }
+        const existing = await filterExistingProjects(projects);
+        if (existing.length === 0) {
+            await vscode.window.showInformationMessage("No reachable project folders found in this group.");
+            return;
+        }
+        const pick = await vscode.window.showQuickPick([
+            { label: "$(folder-opened) Open in this window", newWindow: false },
+            { label: "$(multiple-windows) Open in a new window", newWindow: true }
+        ], { placeHolder: `Open '${item.group.name}'` });
+        if (!pick) {
+            return;
+        }
+        if (pick.newWindow) {
+            await openProject(existing[0], true);
+        }
+        else {
+            const currentFsPaths = new Set((vscode.workspace.workspaceFolders ?? []).map((f) => f.uri.fsPath));
+            const toAdd = existing
+                .filter((p) => !currentFsPaths.has(p.projectPath))
+                .map((p) => ({ uri: vscode.Uri.file(p.projectPath) }));
+            if (toAdd.length > 0) {
+                vscode.workspace.updateWorkspaceFolders(vscode.workspace.workspaceFolders?.length ?? 0, 0, ...toAdd);
+            }
+            await vscode.commands.executeCommand("workbench.view.explorer");
         }
     }), ...registerShelfyCommand("shelfy.revealInVSCodeExplorer", async (item) => {
         const projects = (0, tree_1.collectProjects)(item.group.children);

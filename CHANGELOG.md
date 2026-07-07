@@ -8,6 +8,12 @@ Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how 
 
 ### Added
 
+- **Open Project prompt**: the **Open Project** inline action now asks whether to open in the current window or a new window before navigating. The **Open in New Window** action still opens a new window directly without prompting.
+
+- **Open Folder prompt for groups**: group rows now have an **Open Folder** inline action with the same current/new window prompt. Choosing **this window** adds all existing projects in the group to the current workspace; choosing **new window** opens the first reachable project in a new window. This replaces the previous separate **Open Folder** inline button (`shelfy.showRevealInVSCodeExplorer`) to avoid duplicate icons.
+
+- **Loading indicator**: the sidebar shows a _"Loading..."_ message while Shelfy initialises instead of the generic VS Code _"No content"_ text. When the list is empty after loading, a friendly _"No saved projects yet."_ message with an **Add a project** link is shown instead.
+
 - **Open in Explorer button** (`shelfy.showOpenInExplorer` setting, default: `true`): inline button on project and group rows that reveals the folder in the OS file manager (Windows Explorer / macOS Finder). On a group row, opens the first reachable project folder. Can be hidden by setting `shelfy.showOpenInExplorer` to `false`.
 
 - **Open Folder button** (`shelfy.showRevealInVSCodeExplorer` setting, default: `false`): inline button on group rows only. Adds all projects in the group to the current VS Code workspace and switches to the Explorer panel. Enable by setting `shelfy.showRevealInVSCodeExplorer` to `true`.

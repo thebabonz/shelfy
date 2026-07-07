@@ -59,9 +59,10 @@ or Peacock workspace color:
 ### Open a project
 
 - Click a project row -> behavior is controlled by `shelfy.clickAction`
-- Use inline actions to open in current window or new window directly
+- Use the **Open Project** inline action to get a prompt asking whether to open in the current window or a new window
+- Use the **Open in New Window** inline action to skip the prompt and always open in a new window
+- Use the **Open Folder** inline action (groups only) to get the same prompt — choosing **this window** adds all projects in the group to the current VS Code workspace; choosing **new window** opens the first reachable project in a new window
 - Use the **Open in Explorer** inline button to reveal the project folder in the OS file manager (available on both projects and groups — on a group, reveals the first reachable project folder)
-- Use the **Open Folder** inline button (groups only) to add all projects in the group to the current VS Code workspace and open the Explorer panel
 - Missing folders are shown with a warning icon; open actions are disabled until the path is fixed
 
 ### Fix a missing project folder
