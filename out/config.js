@@ -37,6 +37,8 @@ exports.LEGACY_CONFIGURATION_SECTION = exports.SHELFY_CONFIGURATION_SECTION = vo
 exports.getShelfySetting = getShelfySetting;
 exports.affectsShelfySetting = affectsShelfySetting;
 exports.getStorageMode = getStorageMode;
+exports.showOpenInExplorer = showOpenInExplorer;
+exports.showRevealInVSCodeExplorer = showRevealInVSCodeExplorer;
 const vscode = __importStar(require("vscode"));
 exports.SHELFY_CONFIGURATION_SECTION = "shelfy";
 exports.LEGACY_CONFIGURATION_SECTION = "globalProjects";
@@ -64,5 +66,11 @@ function affectsShelfySetting(event, key) {
 }
 function getStorageMode() {
     return getShelfySetting("storageMode", "profile");
+}
+function showOpenInExplorer() {
+    return getShelfySetting("showOpenInExplorer", true);
+}
+function showRevealInVSCodeExplorer() {
+    return getShelfySetting("showRevealInVSCodeExplorer", false);
 }
 //# sourceMappingURL=config.js.map

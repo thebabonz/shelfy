@@ -23,6 +23,8 @@ or Peacock workspace color:
 - 🚫 Prevent duplicate project paths
 - ⚠️ Show missing project folders and relink them with **Change Project Folder...**
 - ⚡ Quick open projects directly from the sidebar
+- 🗂 **Open in Explorer** button to reveal a project or group in the OS file manager (configurable)
+- 📂 **Open Folder** button on groups to add all their projects to the VS Code workspace (configurable)
 - ▶️ Add, edit, and run project scripts from the sidebar
 - 💾 Import or export the full folders, projects, and scripts configuration as JSON
 - 📥 Import projects from the **Project Manager** extension (tags as folders)
@@ -58,6 +60,8 @@ or Peacock workspace color:
 
 - Click a project row -> behavior is controlled by `shelfy.clickAction`
 - Use inline actions to open in current window or new window directly
+- Use the **Open in Explorer** inline button to reveal the project folder in the OS file manager (available on both projects and groups — on a group, reveals the first reachable project folder)
+- Use the **Open Folder** inline button (groups only) to add all projects in the group to the current VS Code workspace and open the Explorer panel
 - Missing folders are shown with a warning icon; open actions are disabled until the path is fixed
 
 ### Fix a missing project folder
@@ -110,6 +114,8 @@ Optional settings:
   - With `openSameInstance`: _"Open 'ProjectName' in this window?"_
   - With `openNewInstance`: _"Open 'ProjectName' in a new window?"_
 - `shelfy.showProjectPath`: shows the folder path below the project name in the tree view
+- `shelfy.showOpenInExplorer` (default: `true`): show or hide the **Open in Explorer** inline button that reveals the project folder in the OS file manager (Windows Explorer / macOS Finder). Appears on both project rows and group rows.
+- `shelfy.showRevealInVSCodeExplorer` (default: `false`): show or hide the **Open Folder** inline button. Appears on group rows only — adds all projects in the group to the current VS Code workspace and opens the Explorer panel.
 - `shelfy.storageMode`: choose where to store Shelfy data:
   - `profile` (default) — Store data per VS Code profile (isolated between profiles)
   - `global` — Store data globally, shared across all VS Code profiles

@@ -169,10 +169,17 @@
       {
         "command": "shelfy.openInExplorer",
         "title": "Open in Explorer",
-        "enablement": "!(viewItem =~ /(^|:)missingPath(:|$)/)",
         "icon": {
           "light": "media/light/open-explorer.svg",
           "dark": "media/dark/open-explorer.svg"
+        }
+      },
+      {
+        "command": "shelfy.revealInVSCodeExplorer",
+        "title": "Open Folder",
+        "icon": {
+          "light": "media/light/open-project.svg",
+          "dark": "media/dark/open-project.svg"
         }
       },
       {
@@ -341,9 +348,14 @@
           "group": "inline@2"
         },
         {
-          "command": "shelfy.openInExplorer",
-          "when": "view == shelfyView && viewItem =~ /^project(?:$|:)/ && !shelfy.editMode",
+          "command": "shelfy.revealInVSCodeExplorer",
+          "when": "view == shelfyView && viewItem =~ /^group(?:$|:)/ && !shelfy.editMode && config.shelfy.showRevealInVSCodeExplorer",
           "group": "inline@3"
+        },
+        {
+          "command": "shelfy.openInExplorer",
+          "when": "view == shelfyView && (viewItem =~ /^project(?:$|:)/ || viewItem =~ /^group(?:$|:)/) && !shelfy.editMode && config.shelfy.showOpenInExplorer",
+          "group": "inline@4"
         },
         {
           "command": "shelfy.addProject",
@@ -497,6 +509,16 @@
           "type": "boolean",
           "default": false,
           "description": "Show the folder path below the project name in the tree view."
+        },
+        "shelfy.showOpenInExplorer": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show the 'Open in Explorer' inline button (opens the project folder in the OS file explorer)."
+        },
+        "shelfy.showRevealInVSCodeExplorer": {
+          "type": "boolean",
+          "default": false,
+          "description": "Show the 'Open Folder' inline button on group rows (adds all projects in the group to the current VS Code workspace and opens the Explorer panel)."
         },
         "globalProjects.clickAction": {
           "type": "string",

@@ -47,3 +47,11 @@ export type StorageMode = "profile" | "global";
 export function getStorageMode(): StorageMode {
   return getShelfySetting<StorageMode>("storageMode", "profile");
 }
+
+export function showOpenInExplorer(): boolean {
+  return getShelfySetting<boolean>("showOpenInExplorer", true);
+}
+
+export function showRevealInVSCodeExplorer(): boolean {
+  return getShelfySetting<boolean>("showRevealInVSCodeExplorer", false);
+}

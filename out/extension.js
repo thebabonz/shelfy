@@ -348,10 +348,40 @@ async function activate(context) {
     }), ...registerShelfyCommand("shelfy.openProjectInNewWindow", async (item) => {
         await openProjectInNewWindow(item);
     }), ...registerShelfyCommand("shelfy.openInExplorer", async (item) => {
-        if (!(await ensureProjectPathExists(item.project))) {
+        if (item instanceof tree_1.ProjectItem) {
+            if (!(await ensureProjectPathExists(item.project))) {
+                return;
+            }
+            await vscode.commands.executeCommand("revealFileInOS", vscode.Uri.file(item.project.projectPath));
+        }
+        else {
+            const projects = (0, tree_1.collectProjects)(item.group.children);
+            const firstExisting = await findFirstExistingProject(projects);
+            if (!firstExisting) {
+                await vscode.window.showInformationMessage("No reachable project folders found in this group.");
+                return;
+            }
+            await vscode.commands.executeCommand("revealFileInOS", vscode.Uri.file(firstExisting.projectPath));
+        }
+    }), ...registerShelfyCommand("shelfy.revealInVSCodeExplorer", async (item) => {
+        const projects = (0, tree_1.collectProjects)(item.group.children);
+        if (projects.length === 0) {
+            await vscode.window.showInformationMessage("This group contains no projects.");
             return;
         }
-        await vscode.commands.executeCommand("revealFileInOS", vscode.Uri.file(item.project.projectPath));
+        const existing = await filterExistingProjects(projects);
+        if (existing.length === 0) {
+            await vscode.window.showInformationMessage("No reachable project folders found in this group.");
+            return;
+        }
+        const currentFsPaths = new Set((vscode.workspace.workspaceFolders ?? []).map((f) => f.uri.fsPath));
+        const toAdd = existing
+            .filter((p) => !currentFsPaths.has(p.projectPath))
+            .map((p) => ({ uri: vscode.Uri.file(p.projectPath) }));
+        if (toAdd.length > 0) {
+            vscode.workspace.updateWorkspaceFolders(vscode.workspace.workspaceFolders?.length ?? 0, 0, ...toAdd);
+        }
+        await vscode.commands.executeCommand("workbench.view.explorer");
     }), ...registerShelfyCommand("shelfy.openProjectFromRow", async (item) => {
         await openProjectFromRow(item);
     }), ...registerShelfyCommand("shelfy.cloneGroupWithNewBase", requireTreeEditable(async (item) => {
@@ -1009,6 +1039,35 @@ async function ensureProjectPathExists(project) {
     }
     await vscode.window.showErrorMessage(`Project folder not found for "${project.name}": ${project.projectPath}`);
     return false;
+}
+async function findFirstExistingProject(projects) {
+    for (const project of projects) {
+        try {
+            const stat = await vscode.workspace.fs.stat(vscode.Uri.file(project.projectPath));
+            if (stat.type & vscode.FileType.Directory) {
+                return project;
+            }
+        }
+        catch {
+            // Skip missing paths.
+        }
+    }
+    return undefined;
+}
+async function filterExistingProjects(projects) {
+    const results = [];
+    for (const project of projects) {
+        try {
+            const stat = await vscode.workspace.fs.stat(vscode.Uri.file(project.projectPath));
+            if (stat.type & vscode.FileType.Directory) {
+                results.push(project);
+            }
+        }
+        catch {
+            // Skip missing paths.
+        }
+    }
+    return results;
 }
 async function cycleSortMode(provider, nextMode) {
     await provider.setSortMode(nextMode);
