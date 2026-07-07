@@ -169,6 +169,7 @@
       {
         "command": "shelfy.openInExplorer",
         "title": "Open in Explorer",
+        "enablement": "!(viewItem =~ /(^|:)missingPath(:|$)/)",
         "icon": {
           "light": "media/light/open-explorer.svg",
           "dark": "media/dark/open-explorer.svg"
