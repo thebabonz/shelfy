@@ -400,38 +400,49 @@ export class ShelfyProvider
       return;
     }
 
-    const raw = await item.asString();
-    const payload = JSON.parse(raw) as DragPayload;
-
     if (target instanceof ScriptItem) {
       return;
     }
 
-    if (target instanceof ProjectItem) {
-      const targetPosition = this.findNodePosition(target.project.id);
-      if (!targetPosition) {
-        return;
+    const payload = parseDragPayload(await item.asString());
+    if (!payload) {
+      return;
+    }
+
+    try {
+      if (target instanceof ProjectItem) {
+        const targetPosition = this.findNodePosition(target.project.id);
+        if (!targetPosition) {
+          return;
+        }
+
+        const sourcePosition = this.findNodePosition(payload.nodeId);
+        let targetIndex = targetPosition.index;
+
+        // `moveNode` removes the source first, so dragging downward in the same
+        // container needs an index shift to keep drop-before-target behavior.
+        if (
+          sourcePosition &&
+          sourcePosition.parentGroupId === targetPosition.parentGroupId &&
+          sourcePosition.index < targetIndex
+        ) {
+          targetIndex -= 1;
+        }
+
+        await this.store.moveNode(payload.nodeId, targetPosition.parentGroupId, targetIndex);
+      } else if (target instanceof GroupItem) {
+        await this.store.moveNode(payload.nodeId, target.group.id, target.group.children.length);
+      } else {
+        const rootChildren = this.store.read().children;
+        await this.store.moveNode(payload.nodeId, undefined, rootChildren.length);
       }
-
-      const sourcePosition = this.findNodePosition(payload.nodeId);
-      let targetIndex = targetPosition.index;
-
-      // `moveNode` removes the source first, so dragging downward in the same
-      // container needs an index shift to keep drop-before-target behavior.
-      if (
-        sourcePosition &&
-        sourcePosition.parentGroupId === targetPosition.parentGroupId &&
-        sourcePosition.index < targetIndex
-      ) {
-        targetIndex -= 1;
-      }
-
-      await this.store.moveNode(payload.nodeId, targetPosition.parentGroupId, targetIndex);
-    } else if (target instanceof GroupItem) {
-      await this.store.moveNode(payload.nodeId, target.group.id, target.group.children.length);
-    } else {
-      const rootChildren = this.store.read().children;
-      await this.store.moveNode(payload.nodeId, undefined, rootChildren.length);
+    } catch (error) {
+      // A refused move leaves the tree untouched, so tell the user why instead
+      // of failing silently.
+      await vscode.window.showErrorMessage(
+        error instanceof Error ? error.message : "That item could not be moved."
+      );
+      return;
     }
 
     this.refresh();
@@ -575,6 +586,22 @@ export class ShelfyProvider
     };
 
     return walk(this.store.read().children);
+  }
+}
+
+function parseDragPayload(raw: string): DragPayload | undefined {
+  try {
+    const parsed = JSON.parse(raw) as Partial<DragPayload>;
+    if (typeof parsed?.nodeId !== "string") {
+      return undefined;
+    }
+
+    return {
+      nodeId: parsed.nodeId,
+      nodeKind: parsed.nodeKind === "group" ? "group" : "project"
+    };
+  } catch {
+    return undefined;
   }
 }
 

@@ -393,13 +393,7 @@ async function activate(context) {
             await openProject(existing[0], true);
         }
         else {
-            const currentFsPaths = new Set((vscode.workspace.workspaceFolders ?? []).map((f) => f.uri.fsPath));
-            const toAdd = existing
-                .filter((p) => !currentFsPaths.has(p.projectPath))
-                .map((p) => ({ uri: vscode.Uri.file(p.projectPath) }));
-            if (toAdd.length > 0) {
-                vscode.workspace.updateWorkspaceFolders(vscode.workspace.workspaceFolders?.length ?? 0, 0, ...toAdd);
-            }
+            await addProjectsToWorkspace(existing);
             await vscode.commands.executeCommand("workbench.view.explorer");
         }
     }), ...registerShelfyCommand("shelfy.revealInVSCodeExplorer", async (item) => {
@@ -413,13 +407,7 @@ async function activate(context) {
             await vscode.window.showInformationMessage("No reachable project folders found in this group.");
             return;
         }
-        const currentFsPaths = new Set((vscode.workspace.workspaceFolders ?? []).map((f) => f.uri.fsPath));
-        const toAdd = existing
-            .filter((p) => !currentFsPaths.has(p.projectPath))
-            .map((p) => ({ uri: vscode.Uri.file(p.projectPath) }));
-        if (toAdd.length > 0) {
-            vscode.workspace.updateWorkspaceFolders(vscode.workspace.workspaceFolders?.length ?? 0, 0, ...toAdd);
-        }
+        await addProjectsToWorkspace(existing);
         await vscode.commands.executeCommand("workbench.view.explorer");
     }), ...registerShelfyCommand("shelfy.openProjectFromRow", async (item) => {
         await openProjectFromRow(item);
@@ -512,7 +500,7 @@ async function pickSavedProjectInCurrentWindow(store) {
         const folderPath = getProjectFolderPath(nodes, project.id);
         const iconLabel = (0, personalization_1.formatPersonalizationIcon)(project.personalization?.icon);
         const detailParts = [project.projectPath, iconLabel];
-        if (currentProjectPath && (0, store_1.normalizeProjectPath)(project.projectPath) === (0, store_1.normalizeProjectPath)(currentProjectPath)) {
+        if (currentProjectPath && (0, store_1.getProjectPathKey)(project.projectPath) === (0, store_1.getProjectPathKey)(currentProjectPath)) {
             detailParts.push("Current window");
         }
         return {
@@ -1078,6 +1066,21 @@ async function ensureProjectPathExists(project) {
     }
     await vscode.window.showErrorMessage(`Project folder not found for "${project.name}": ${project.projectPath}`);
     return false;
+}
+/**
+ * Adds the given projects as workspace folders, skipping any folder the window
+ * already has open. Comparison goes through the store's path key so casing or a
+ * trailing separator does not add the same folder twice.
+ */
+async function addProjectsToWorkspace(projects) {
+    const currentKeys = new Set((vscode.workspace.workspaceFolders ?? []).map((folder) => (0, store_1.getProjectPathKey)(folder.uri.fsPath)));
+    const toAdd = projects
+        .filter((project) => !currentKeys.has((0, store_1.getProjectPathKey)(project.projectPath)))
+        .map((project) => ({ uri: vscode.Uri.file(project.projectPath) }));
+    if (toAdd.length === 0) {
+        return;
+    }
+    vscode.workspace.updateWorkspaceFolders(vscode.workspace.workspaceFolders?.length ?? 0, 0, ...toAdd);
 }
 async function findFirstExistingProject(projects) {
     for (const project of projects) {

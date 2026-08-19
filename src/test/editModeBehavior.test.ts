@@ -706,3 +706,265 @@ test("writing v2 data clears legacy storage so empty trees stay empty", async ()
 
   assert.deepEqual(store.read(), { version: 2, children: [] });
 });
+
+const CASE_INSENSITIVE_FILE_SYSTEM = process.platform === "win32" || process.platform === "darwin";
+
+/** Builds an absolute path that is meaningful on the host platform. */
+function absoluteProjectPath(...segments: string[]): string {
+  return process.platform === "win32"
+    ? path.join("C:\\", ...segments)
+    : path.join("/", ...segments);
+}
+
+/** Two absolute paths that share no common parent folder on the host platform. */
+function unrelatedProjectPaths(): [string, string] {
+  return process.platform === "win32"
+    ? ["C:\alpha\one", "D:\beta\two"]
+    : ["/alpha/one", "/beta/two"];
+}
+
+function createStoreWithChildren(children: NodeData[]): ProjectStore {
+  return new ProjectStore(
+    createStoreContext({
+      [STORAGE_KEY]: { version: 2, children }
+    })
+  );
+}
+
+function collectProjectPaths(nodes: NodeData[], collected: string[] = []): string[] {
+  for (const node of nodes) {
+    if (node.kind === "project") {
+      collected.push(node.projectPath);
+    } else {
+      collectProjectPaths(node.children, collected);
+    }
+  }
+
+  return collected;
+}
+
+test("a rejected move leaves the dragged item in the tree", async () => {
+  const store = createStoreWithChildren(createTree());
+  await store.initialize();
+
+  // Dropping a group onto one of its own descendants has to be refused without
+  // extracting the group from the live tree first.
+  await assert.rejects(
+    () => store.moveNode("frontend", "buttons", 0),
+    /into itself or one of its children/
+  );
+
+  assert.deepEqual(
+    store.read().children.map((node) => node.id),
+    ["frontend", "backend", "root-tool"]
+  );
+
+  const frontend = store.read().children[0];
+  if (!frontend || frontend.kind !== "group") {
+    throw new Error("Expected frontend group.");
+  }
+
+  assert.deepEqual(frontend.children.map((node) => node.id), ["web-app", "components"]);
+});
+
+test("a move onto a missing group is refused without losing the dragged item", async () => {
+  const store = createStoreWithChildren(createTree());
+  await store.initialize();
+
+  await assert.rejects(() => store.moveNode("root-tool", "does-not-exist", 0), /not found/);
+
+  assert.deepEqual(
+    store.read().children.map((node) => node.id),
+    ["frontend", "backend", "root-tool"]
+  );
+});
+
+test("project paths are stored without a trailing separator", async () => {
+  const store = createStoreWithChildren([]);
+  await store.initialize();
+
+  const projectPath = absoluteProjectPath("projects", "web-app");
+  const added = await store.addProject({ name: "Web App", projectPath: projectPath + path.sep });
+
+  assert.equal(added.projectPath, projectPath);
+});
+
+test("the same folder cannot be saved twice under an equivalent path", async () => {
+  const store = createStoreWithChildren([]);
+  await store.initialize();
+
+  const projectPath = absoluteProjectPath("projects", "web-app");
+  await store.addProject({ name: "Web App", projectPath });
+
+  const equivalentPaths = [
+    projectPath + path.sep,
+    path.join(projectPath, ".", ""),
+    absoluteProjectPath("projects", "unused", "..", "web-app")
+  ];
+
+  for (const equivalentPath of equivalentPaths) {
+    await assert.rejects(
+      () => store.addProject({ name: "Duplicate", projectPath: equivalentPath }),
+      /already saved/,
+      `Expected "${equivalentPath}" to be rejected as a duplicate.`
+    );
+  }
+
+  assert.equal(store.read().children.length, 1);
+});
+
+test(
+  "the same folder cannot be saved twice under different casing",
+  { skip: CASE_INSENSITIVE_FILE_SYSTEM ? false : "file system is case-sensitive" },
+  async () => {
+    const store = createStoreWithChildren([]);
+    await store.initialize();
+
+    const projectPath = absoluteProjectPath("Projects", "Web-App");
+    await store.addProject({ name: "Web App", projectPath });
+
+    await assert.rejects(
+      () => store.addProject({ name: "Duplicate", projectPath: projectPath.toLowerCase() }),
+      /already saved/
+    );
+
+    await assert.rejects(
+      () => store.updateProjectPath("root-tool", projectPath.toLowerCase()),
+      /not found|already saved/
+    );
+
+    // The casing the user picked is preserved for display.
+    const stored = store.read().children[0];
+    if (!stored || stored.kind !== "project") {
+      throw new Error("Expected stored project.");
+    }
+
+    assert.equal(stored.projectPath, projectPath);
+  }
+);
+
+test("cloning a group rebases its project paths onto the new base", async () => {
+  const store = createStoreWithChildren([
+    {
+      kind: "group",
+      id: "repos",
+      name: "Repos",
+      children: [
+        {
+          kind: "project",
+          id: "one",
+          name: "One",
+          projectPath: absoluteProjectPath("src", "one")
+        },
+        {
+          kind: "group",
+          id: "nested",
+          name: "Nested",
+          children: [
+            {
+              kind: "project",
+              id: "two",
+              name: "Two",
+              projectPath: absoluteProjectPath("src", "nested", "two")
+            }
+          ]
+        }
+      ]
+    }
+  ]);
+
+  await store.initialize();
+
+  const newBase = absoluteProjectPath("worktree");
+  const { group, commonBase } = await store.cloneGroupWithNewBase("repos", "Repos Copy", newBase);
+
+  assert.equal(commonBase, absoluteProjectPath("src"));
+  assert.deepEqual(collectProjectPaths([group]), [
+    path.join(newBase, "one"),
+    path.join(newBase, "nested", "two")
+  ]);
+});
+
+test("cloning a group whose projects share no common base is refused", async () => {
+  const [first, second] = unrelatedProjectPaths();
+  const store = createStoreWithChildren([
+    {
+      kind: "group",
+      id: "repos",
+      name: "Repos",
+      children: [
+        { kind: "project", id: "one", name: "One", projectPath: first },
+        { kind: "project", id: "two", name: "Two", projectPath: second }
+      ]
+    }
+  ]);
+
+  await store.initialize();
+
+  await assert.rejects(
+    () => store.cloneGroupWithNewBase("repos", "Repos Copy", absoluteProjectPath("worktree")),
+    /do not share a common parent folder/
+  );
+
+  // The rejected clone must not have been added to the tree.
+  assert.equal(store.read().children.length, 1);
+  assert.deepEqual(collectProjectPaths(store.read().children), [first, second]);
+});
+
+test("cloning a group is refused when a rebased path is already saved", async () => {
+  const store = createStoreWithChildren([
+    {
+      kind: "group",
+      id: "repos",
+      name: "Repos",
+      children: [
+        {
+          kind: "project",
+          id: "one",
+          name: "One",
+          projectPath: absoluteProjectPath("src", "one")
+        }
+      ]
+    },
+    {
+      kind: "project",
+      id: "already-there",
+      name: "Already There",
+      projectPath: absoluteProjectPath("worktree", "one")
+    }
+  ]);
+
+  await store.initialize();
+
+  await assert.rejects(
+    () => store.cloneGroupWithNewBase("repos", "Repos Copy", absoluteProjectPath("worktree")),
+    /already saved as "Already There"/
+  );
+
+  assert.equal(store.read().children.length, 2);
+});
+
+test("an exported configuration can always be imported again", async () => {
+  const store = createStoreWithChildren([
+    {
+      kind: "group",
+      id: "repos",
+      name: "Repos",
+      children: [
+        {
+          kind: "project",
+          id: "one",
+          name: "One",
+          projectPath: absoluteProjectPath("src", "one")
+        }
+      ]
+    }
+  ]);
+
+  await store.initialize();
+  await store.cloneGroupWithNewBase("repos", "Repos Copy", absoluteProjectPath("worktree"));
+
+  await store.importData(store.exportData());
+
+  assert.equal(store.read().children.length, 2);
+});

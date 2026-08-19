@@ -35,6 +35,7 @@ var __importStar = (this && this.__importStar) || (function () {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.ProjectStore = void 0;
 exports.normalizeProjectPath = normalizeProjectPath;
+exports.getProjectPathKey = getProjectPathKey;
 exports.findGroup = findGroup;
 exports.findProjectByPath = findProjectByPath;
 exports.findCommonBasePath = findCommonBasePath;
@@ -301,8 +302,12 @@ class ProjectStore {
             throw new Error("Group has no projects to repath.");
         }
         const commonBase = findCommonBasePath(projectPaths);
-        const normalizedNew = path.normalize(newBasePath);
+        if (!commonBase) {
+            throw new Error("The projects in this group do not share a common parent folder, so their paths cannot be rebased.");
+        }
+        const normalizedNew = normalizeProjectPath(newBasePath);
         const cloned = deepCloneGroupWithRebase(group, commonBase, normalizedNew, newName);
+        assertClonedProjectPathsAreAvailable(data.children, cloned);
         const parentResult = findParentGroupIdForNode(data.children, groupId);
         if (!parentResult.found) {
             throw new Error("Group not found in tree.");
@@ -322,24 +327,27 @@ class ProjectStore {
     }
     async moveNode(nodeId, targetGroupId, targetIndex) {
         const data = this.read();
-        const extracted = extractNode(data.children, nodeId);
-        if (!extracted) {
+        // Validate and resolve the destination before touching the tree: `read()`
+        // returns the live cache, so throwing after extracting the node would drop
+        // it from the tree even though the move never completed.
+        const node = findNodeById(data.children, nodeId);
+        if (!node) {
             throw new Error("Dragged item not found.");
         }
-        if (extracted.node.kind === "group" && targetGroupId) {
-            const dropTarget = findGroup(data.children, targetGroupId);
-            if (!dropTarget) {
-                throw new Error("Drop target group not found.");
-            }
-            if (containsGroup(extracted.node, targetGroupId)) {
-                throw new Error("Cannot move a group into itself or one of its children.");
-            }
+        if (node.kind === "group" && targetGroupId && containsGroup(node, targetGroupId)) {
+            throw new Error("Cannot move a group into itself or one of its children.");
         }
+        // Splicing mutates these arrays in place, so the reference stays valid
+        // across the extraction below.
         const targetArray = targetGroupId
             ? findGroup(data.children, targetGroupId)?.children
             : data.children;
         if (!targetArray) {
-            throw new Error("Target container not found.");
+            throw new Error("Drop target group not found.");
+        }
+        const extracted = extractNode(data.children, nodeId);
+        if (!extracted) {
+            throw new Error("Dragged item not found.");
         }
         const clampedIndex = Math.max(0, Math.min(targetIndex, targetArray.length));
         targetArray.splice(clampedIndex, 0, extracted.node);
@@ -348,7 +356,32 @@ class ProjectStore {
 }
 exports.ProjectStore = ProjectStore;
 function normalizeProjectPath(input) {
-    return path.normalize(input);
+    return stripTrailingSeparators(path.normalize(input.trim()));
+}
+/**
+ * Comparison key for a project path. Paths are stored with the casing the user
+ * picked, but compared case-insensitively where the file system is, so the same
+ * folder cannot be saved twice under different casing.
+ */
+function getProjectPathKey(projectPath) {
+    const normalized = normalizeProjectPath(projectPath);
+    return isCaseInsensitiveFileSystem() ? normalized.toLowerCase() : normalized;
+}
+function isCaseInsensitiveFileSystem() {
+    return process.platform === "win32" || process.platform === "darwin";
+}
+function stripTrailingSeparators(normalized) {
+    let end = normalized.length;
+    while (end > 1 && normalized.charAt(end - 1) === path.sep) {
+        end -= 1;
+    }
+    const trimmed = normalized.slice(0, end);
+    // "C:\", "/" and "\\" are roots rather than folders named "C:" or "", so they
+    // keep their separator; everything else drops it.
+    if (trimmed.length === 0 || trimmed === path.sep || /^[A-Za-z]:$/.test(trimmed)) {
+        return normalized;
+    }
+    return trimmed;
 }
 function hasRootChildren(data) {
     return data !== undefined && data.children.length > 0;
@@ -371,14 +404,17 @@ function findGroup(nodes, groupId) {
     return undefined;
 }
 function findProjectByPath(nodes, projectPath) {
+    return findProjectByPathKey(nodes, getProjectPathKey(projectPath));
+}
+function findProjectByPathKey(nodes, projectPathKey) {
     for (const node of nodes) {
         if (node.kind === "project") {
-            if (normalizeProjectPath(node.projectPath) === projectPath) {
+            if (getProjectPathKey(node.projectPath) === projectPathKey) {
                 return node;
             }
         }
         else {
-            const nested = findProjectByPath(node.children, projectPath);
+            const nested = findProjectByPathKey(node.children, projectPathKey);
             if (nested) {
                 return nested;
             }
@@ -442,6 +478,25 @@ function containsGroup(group, groupId) {
     }
     return false;
 }
+/**
+ * Every saved project must have a unique path, so a clone that would collide
+ * with an existing project (or with another project inside the clone) is
+ * rejected before it reaches the tree.
+ */
+function assertClonedProjectPathsAreAvailable(nodes, cloned) {
+    const clonedKeys = new Set();
+    for (const clonedPath of collectProjectPathsFromGroup(cloned)) {
+        const key = getProjectPathKey(clonedPath);
+        const existing = findProjectByPathKey(nodes, key);
+        if (existing) {
+            throw new Error(`Cloning would reuse "${clonedPath}", which is already saved as "${existing.name}".`);
+        }
+        if (clonedKeys.has(key)) {
+            throw new Error(`Cloning would save "${clonedPath}" more than once.`);
+        }
+        clonedKeys.add(key);
+    }
+}
 function collectProjectPathsFromGroup(group) {
     const result = [];
     for (const child of group.children) {
@@ -458,29 +513,32 @@ function findCommonBasePath(paths) {
     if (paths.length === 0) {
         return "";
     }
-    const normalized = paths.map((p) => path.normalize(p));
+    const normalized = paths.map((p) => normalizeProjectPath(p));
     const segments = normalized.map((p) => p.split(path.sep));
     const first = segments[0];
     // Start at most at the parent of the first path (exclude the leaf segment)
     let commonLength = first.length - 1;
     for (const segs of segments.slice(1)) {
         let i = 0;
-        while (i < commonLength && i < segs.length && first[i] === segs[i]) {
+        while (i < commonLength && i < segs.length && matchesPathSegment(first[i], segs[i])) {
             i++;
         }
         commonLength = i;
     }
     return first.slice(0, commonLength).join(path.sep);
 }
+function matchesPathSegment(left, right) {
+    return isCaseInsensitiveFileSystem() ? left.toLowerCase() === right.toLowerCase() : left === right;
+}
 function rebasePath(projectPath, oldBase, newBase) {
-    const normalized = path.normalize(projectPath);
-    const normalizedOld = path.normalize(oldBase);
+    const normalized = normalizeProjectPath(projectPath);
+    const normalizedOld = normalizeProjectPath(oldBase);
     const prefix = normalizedOld + path.sep;
     if (normalized.startsWith(prefix)) {
-        return path.join(newBase, normalized.slice(prefix.length));
+        return normalizeProjectPath(path.join(newBase, normalized.slice(prefix.length)));
     }
     if (normalized === normalizedOld) {
-        return newBase;
+        return normalizeProjectPath(newBase);
     }
     return normalized;
 }
@@ -569,10 +627,11 @@ function normalizeNode(value, usedIds, projectPaths, location) {
     }
     if (record.kind === "project") {
         const projectPath = normalizeProjectPath(readNonEmptyString(record.projectPath, `Project path at ${location}`));
-        if (projectPaths.has(projectPath)) {
+        const projectPathKey = getProjectPathKey(projectPath);
+        if (projectPaths.has(projectPathKey)) {
             throw new Error(`Duplicate project path in import file: "${projectPath}".`);
         }
-        projectPaths.add(projectPath);
+        projectPaths.add(projectPathKey);
         return {
             kind: "project",
             id: getUniqueId(record.id, usedIds),

@@ -577,4 +577,192 @@ function createStoreContext(initialState) {
     await store.write({ version: 2, children: [] });
     strict_1.default.deepEqual(store.read(), { version: 2, children: [] });
 });
+const CASE_INSENSITIVE_FILE_SYSTEM = process.platform === "win32" || process.platform === "darwin";
+/** Builds an absolute path that is meaningful on the host platform. */
+function absoluteProjectPath(...segments) {
+    return process.platform === "win32"
+        ? path.join("C:\\", ...segments)
+        : path.join("/", ...segments);
+}
+/** Two absolute paths that share no common parent folder on the host platform. */
+function unrelatedProjectPaths() {
+    return process.platform === "win32"
+        ? ["C:\alpha\one", "D:\beta\two"]
+        : ["/alpha/one", "/beta/two"];
+}
+function createStoreWithChildren(children) {
+    return new store_1.ProjectStore(createStoreContext({
+        [STORAGE_KEY]: { version: 2, children }
+    }));
+}
+function collectProjectPaths(nodes, collected = []) {
+    for (const node of nodes) {
+        if (node.kind === "project") {
+            collected.push(node.projectPath);
+        }
+        else {
+            collectProjectPaths(node.children, collected);
+        }
+    }
+    return collected;
+}
+(0, node_test_1.default)("a rejected move leaves the dragged item in the tree", async () => {
+    const store = createStoreWithChildren(createTree());
+    await store.initialize();
+    // Dropping a group onto one of its own descendants has to be refused without
+    // extracting the group from the live tree first.
+    await strict_1.default.rejects(() => store.moveNode("frontend", "buttons", 0), /into itself or one of its children/);
+    strict_1.default.deepEqual(store.read().children.map((node) => node.id), ["frontend", "backend", "root-tool"]);
+    const frontend = store.read().children[0];
+    if (!frontend || frontend.kind !== "group") {
+        throw new Error("Expected frontend group.");
+    }
+    strict_1.default.deepEqual(frontend.children.map((node) => node.id), ["web-app", "components"]);
+});
+(0, node_test_1.default)("a move onto a missing group is refused without losing the dragged item", async () => {
+    const store = createStoreWithChildren(createTree());
+    await store.initialize();
+    await strict_1.default.rejects(() => store.moveNode("root-tool", "does-not-exist", 0), /not found/);
+    strict_1.default.deepEqual(store.read().children.map((node) => node.id), ["frontend", "backend", "root-tool"]);
+});
+(0, node_test_1.default)("project paths are stored without a trailing separator", async () => {
+    const store = createStoreWithChildren([]);
+    await store.initialize();
+    const projectPath = absoluteProjectPath("projects", "web-app");
+    const added = await store.addProject({ name: "Web App", projectPath: projectPath + path.sep });
+    strict_1.default.equal(added.projectPath, projectPath);
+});
+(0, node_test_1.default)("the same folder cannot be saved twice under an equivalent path", async () => {
+    const store = createStoreWithChildren([]);
+    await store.initialize();
+    const projectPath = absoluteProjectPath("projects", "web-app");
+    await store.addProject({ name: "Web App", projectPath });
+    const equivalentPaths = [
+        projectPath + path.sep,
+        path.join(projectPath, ".", ""),
+        absoluteProjectPath("projects", "unused", "..", "web-app")
+    ];
+    for (const equivalentPath of equivalentPaths) {
+        await strict_1.default.rejects(() => store.addProject({ name: "Duplicate", projectPath: equivalentPath }), /already saved/, `Expected "${equivalentPath}" to be rejected as a duplicate.`);
+    }
+    strict_1.default.equal(store.read().children.length, 1);
+});
+(0, node_test_1.default)("the same folder cannot be saved twice under different casing", { skip: CASE_INSENSITIVE_FILE_SYSTEM ? false : "file system is case-sensitive" }, async () => {
+    const store = createStoreWithChildren([]);
+    await store.initialize();
+    const projectPath = absoluteProjectPath("Projects", "Web-App");
+    await store.addProject({ name: "Web App", projectPath });
+    await strict_1.default.rejects(() => store.addProject({ name: "Duplicate", projectPath: projectPath.toLowerCase() }), /already saved/);
+    await strict_1.default.rejects(() => store.updateProjectPath("root-tool", projectPath.toLowerCase()), /not found|already saved/);
+    // The casing the user picked is preserved for display.
+    const stored = store.read().children[0];
+    if (!stored || stored.kind !== "project") {
+        throw new Error("Expected stored project.");
+    }
+    strict_1.default.equal(stored.projectPath, projectPath);
+});
+(0, node_test_1.default)("cloning a group rebases its project paths onto the new base", async () => {
+    const store = createStoreWithChildren([
+        {
+            kind: "group",
+            id: "repos",
+            name: "Repos",
+            children: [
+                {
+                    kind: "project",
+                    id: "one",
+                    name: "One",
+                    projectPath: absoluteProjectPath("src", "one")
+                },
+                {
+                    kind: "group",
+                    id: "nested",
+                    name: "Nested",
+                    children: [
+                        {
+                            kind: "project",
+                            id: "two",
+                            name: "Two",
+                            projectPath: absoluteProjectPath("src", "nested", "two")
+                        }
+                    ]
+                }
+            ]
+        }
+    ]);
+    await store.initialize();
+    const newBase = absoluteProjectPath("worktree");
+    const { group, commonBase } = await store.cloneGroupWithNewBase("repos", "Repos Copy", newBase);
+    strict_1.default.equal(commonBase, absoluteProjectPath("src"));
+    strict_1.default.deepEqual(collectProjectPaths([group]), [
+        path.join(newBase, "one"),
+        path.join(newBase, "nested", "two")
+    ]);
+});
+(0, node_test_1.default)("cloning a group whose projects share no common base is refused", async () => {
+    const [first, second] = unrelatedProjectPaths();
+    const store = createStoreWithChildren([
+        {
+            kind: "group",
+            id: "repos",
+            name: "Repos",
+            children: [
+                { kind: "project", id: "one", name: "One", projectPath: first },
+                { kind: "project", id: "two", name: "Two", projectPath: second }
+            ]
+        }
+    ]);
+    await store.initialize();
+    await strict_1.default.rejects(() => store.cloneGroupWithNewBase("repos", "Repos Copy", absoluteProjectPath("worktree")), /do not share a common parent folder/);
+    // The rejected clone must not have been added to the tree.
+    strict_1.default.equal(store.read().children.length, 1);
+    strict_1.default.deepEqual(collectProjectPaths(store.read().children), [first, second]);
+});
+(0, node_test_1.default)("cloning a group is refused when a rebased path is already saved", async () => {
+    const store = createStoreWithChildren([
+        {
+            kind: "group",
+            id: "repos",
+            name: "Repos",
+            children: [
+                {
+                    kind: "project",
+                    id: "one",
+                    name: "One",
+                    projectPath: absoluteProjectPath("src", "one")
+                }
+            ]
+        },
+        {
+            kind: "project",
+            id: "already-there",
+            name: "Already There",
+            projectPath: absoluteProjectPath("worktree", "one")
+        }
+    ]);
+    await store.initialize();
+    await strict_1.default.rejects(() => store.cloneGroupWithNewBase("repos", "Repos Copy", absoluteProjectPath("worktree")), /already saved as "Already There"/);
+    strict_1.default.equal(store.read().children.length, 2);
+});
+(0, node_test_1.default)("an exported configuration can always be imported again", async () => {
+    const store = createStoreWithChildren([
+        {
+            kind: "group",
+            id: "repos",
+            name: "Repos",
+            children: [
+                {
+                    kind: "project",
+                    id: "one",
+                    name: "One",
+                    projectPath: absoluteProjectPath("src", "one")
+                }
+            ]
+        }
+    ]);
+    await store.initialize();
+    await store.cloneGroupWithNewBase("repos", "Repos Copy", absoluteProjectPath("worktree"));
+    await store.importData(store.exportData());
+    strict_1.default.equal(store.read().children.length, 2);
+});
 //# sourceMappingURL=editModeBehavior.test.js.map
