@@ -11,10 +11,10 @@ exports.SHELFY_TREE_MIME = "application/vnd.code.tree.shelfyView";
 function isShelfyTreeEditable(editMode, hasFilter) {
     return editMode && !hasFilter;
 }
-function getShelfyTreeMimeTypes(editMode) {
-    // VS Code snapshots tree drag/drop MIME types when the controller is
-    // registered, so edit-mode toggles recreate the tree view.
-    return editMode ? [exports.SHELFY_TREE_MIME] : [];
+function getShelfyTreeMimeTypes() {
+    // Hosts snapshot these at registration. Keep them stable so edit-mode
+    // toggles do not need to dispose/recreate the tree; handlers gate editing.
+    return [exports.SHELFY_TREE_MIME];
 }
 function getProjectRowCommandDefinition(editMode) {
     if (editMode) {

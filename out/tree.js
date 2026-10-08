@@ -122,10 +122,10 @@ class ScriptItem extends vscode.TreeItem {
 exports.ScriptItem = ScriptItem;
 class ShelfyProvider {
     get dropMimeTypes() {
-        return (0, treeBehavior_1.getShelfyTreeMimeTypes)(this.editMode);
+        return (0, treeBehavior_1.getShelfyTreeMimeTypes)();
     }
     get dragMimeTypes() {
-        return (0, treeBehavior_1.getShelfyTreeMimeTypes)(this.editMode);
+        return (0, treeBehavior_1.getShelfyTreeMimeTypes)();
     }
     constructor(context, store) {
         this.context = context;

@@ -28,10 +28,10 @@ export function isShelfyTreeEditable(editMode: boolean, hasFilter: boolean): boo
   return editMode && !hasFilter;
 }
 
-export function getShelfyTreeMimeTypes(editMode: boolean): readonly string[] {
-  // VS Code snapshots tree drag/drop MIME types when the controller is
-  // registered, so edit-mode toggles recreate the tree view.
-  return editMode ? [SHELFY_TREE_MIME] : [];
+export function getShelfyTreeMimeTypes(): readonly string[] {
+  // Hosts snapshot these at registration. Keep them stable so edit-mode
+  // toggles do not need to dispose/recreate the tree; handlers gate editing.
+  return [SHELFY_TREE_MIME];
 }
 
 export function getProjectRowCommandDefinition(

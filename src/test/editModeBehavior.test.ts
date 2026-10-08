@@ -130,12 +130,8 @@ function createStoreContext(initialState: Record<string, RootData | undefined>):
   } as unknown as import("vscode").ExtensionContext;
 }
 
-test("drag and drop mime types are disabled outside edit mode", () => {
-  assert.deepEqual(getShelfyTreeMimeTypes(false), []);
-});
-
-test("drag and drop mime types are enabled in edit mode", () => {
-  assert.deepEqual(getShelfyTreeMimeTypes(true), [SHELFY_TREE_MIME]);
+test("drag and drop mime types stay registered for the tree lifetime", () => {
+  assert.deepEqual(getShelfyTreeMimeTypes(), [SHELFY_TREE_MIME]);
 });
 
 test("project rows do not expose an open command in edit mode", () => {
@@ -149,7 +145,6 @@ test("project rows do not expose an open command in edit mode", () => {
 test("filter mode disables tree editing affordances", () => {
   assert.equal(isShelfyTreeEditable(true, false), true);
   assert.equal(isShelfyTreeEditable(true, true), false);
-  assert.deepEqual(getShelfyTreeMimeTypes(isShelfyTreeEditable(true, true)), []);
   assert.deepEqual(getProjectRowCommandDefinition(isShelfyTreeEditable(true, true)), {
     command: "shelfy.openProjectFromRow",
     title: "Open Project"
