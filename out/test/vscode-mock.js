@@ -3,10 +3,11 @@
  * Registers a minimal vscode module mock so that tests can run outside of a VS Code extension host.
  */
 Object.defineProperty(exports, "__esModule", { value: true });
+exports.vscodeMock = void 0;
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const Module = require("module");
 const MOCK_ID = "__vscode_mock__";
-const vscodeMock = {
+exports.vscodeMock = {
     workspace: {
         getConfiguration: (_section) => ({
             get: (_key, defaultValue) => defaultValue,
@@ -28,7 +29,7 @@ require.cache[MOCK_ID] = {
     id: MOCK_ID,
     filename: MOCK_ID,
     loaded: true,
-    exports: vscodeMock,
+    exports: exports.vscodeMock,
     paths: [],
     children: [],
     parent: null,

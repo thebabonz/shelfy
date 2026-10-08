@@ -150,11 +150,11 @@ export class ShelfyProvider
   readonly onDidChangeTreeData = this.emitter.event;
 
   get dropMimeTypes(): readonly string[] {
-    return getShelfyTreeMimeTypes(this.editMode);
+    return getShelfyTreeMimeTypes();
   }
 
   get dragMimeTypes(): readonly string[] {
-    return getShelfyTreeMimeTypes(this.editMode);
+    return getShelfyTreeMimeTypes();
   }
 
   private readonly colorCache = new Map<string, string | undefined>();

@@ -24,7 +24,6 @@ import { collectProjects, ShelfyProvider, GroupItem, ProjectItem, ScriptItem, So
 import {
   getAdjacentMoveTargets,
   getAdjacentScriptMoveTargets,
-  getShelfyTreeMimeTypes,
   getMoveDestinations,
   isShelfyTreeEditable
 } from "./treeBehavior";
@@ -99,18 +98,11 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   };
 
   const registerTreeView = (): void => {
-    for (const disposable of treeViewDisposables) {
-      disposable.dispose();
-    }
-
     const treeViewOptions: vscode.TreeViewOptions<GroupItem | ProjectItem | ScriptItem> = {
       treeDataProvider: provider,
+      dragAndDropController: provider,
       showCollapseAll: false
     };
-
-    if (getShelfyTreeMimeTypes(treeEditable).length > 0) {
-      treeViewOptions.dragAndDropController = provider;
-    }
 
     treeView = vscode.window.createTreeView("shelfyView", treeViewOptions);
     updateTreeViewState();
@@ -139,7 +131,6 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     treeEditable = nextTreeEditable;
     await vscode.commands.executeCommand("setContext", "shelfy.editMode", treeEditable);
     provider.setEditMode(treeEditable);
-    registerTreeView();
   };
 
   const ensureTreeEditable = async (): Promise<boolean> => {

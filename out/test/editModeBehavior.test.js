@@ -137,11 +137,8 @@ function createStoreContext(initialState) {
         }
     };
 }
-(0, node_test_1.default)("drag and drop mime types are disabled outside edit mode", () => {
-    strict_1.default.deepEqual((0, treeBehavior_1.getShelfyTreeMimeTypes)(false), []);
-});
-(0, node_test_1.default)("drag and drop mime types are enabled in edit mode", () => {
-    strict_1.default.deepEqual((0, treeBehavior_1.getShelfyTreeMimeTypes)(true), [treeBehavior_1.SHELFY_TREE_MIME]);
+(0, node_test_1.default)("drag and drop mime types stay registered for the tree lifetime", () => {
+    strict_1.default.deepEqual((0, treeBehavior_1.getShelfyTreeMimeTypes)(), [treeBehavior_1.SHELFY_TREE_MIME]);
 });
 (0, node_test_1.default)("project rows do not expose an open command in edit mode", () => {
     strict_1.default.equal((0, treeBehavior_1.getProjectRowCommandDefinition)(true), undefined);
@@ -153,7 +150,6 @@ function createStoreContext(initialState) {
 (0, node_test_1.default)("filter mode disables tree editing affordances", () => {
     strict_1.default.equal((0, treeBehavior_1.isShelfyTreeEditable)(true, false), true);
     strict_1.default.equal((0, treeBehavior_1.isShelfyTreeEditable)(true, true), false);
-    strict_1.default.deepEqual((0, treeBehavior_1.getShelfyTreeMimeTypes)((0, treeBehavior_1.isShelfyTreeEditable)(true, true)), []);
     strict_1.default.deepEqual((0, treeBehavior_1.getProjectRowCommandDefinition)((0, treeBehavior_1.isShelfyTreeEditable)(true, true)), {
         command: "shelfy.openProjectFromRow",
         title: "Open Project"

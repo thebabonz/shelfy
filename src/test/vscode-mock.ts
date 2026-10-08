@@ -9,7 +9,7 @@ const Module = require("module") as {
 
 const MOCK_ID = "__vscode_mock__";
 
-const vscodeMock = {
+export const vscodeMock = {
   workspace: {
     getConfiguration: (_section?: string) => ({
       get: <T>(_key: string, defaultValue: T): T => defaultValue,

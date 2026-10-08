@@ -101,16 +101,11 @@ async function activate(context) {
         }
     };
     const registerTreeView = () => {
-        for (const disposable of treeViewDisposables) {
-            disposable.dispose();
-        }
         const treeViewOptions = {
             treeDataProvider: provider,
+            dragAndDropController: provider,
             showCollapseAll: false
         };
-        if ((0, treeBehavior_1.getShelfyTreeMimeTypes)(treeEditable).length > 0) {
-            treeViewOptions.dragAndDropController = provider;
-        }
         treeView = vscode.window.createTreeView("shelfyView", treeViewOptions);
         updateTreeViewState();
         treeViewDisposables = [
@@ -135,7 +130,6 @@ async function activate(context) {
         treeEditable = nextTreeEditable;
         await vscode.commands.executeCommand("setContext", "shelfy.editMode", treeEditable);
         provider.setEditMode(treeEditable);
-        registerTreeView();
     };
     const ensureTreeEditable = async () => {
         if (provider.hasFilter()) {
